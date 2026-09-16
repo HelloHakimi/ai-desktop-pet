@@ -1,0 +1,100 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "Yuuri.moc3",
+    "Textures": [
+      "Yuuri.2048/texture_00.png",
+      "Yuuri.2048/texture_01.png",
+      "Yuuri.2048/texture_02.png",
+      "Yuuri.2048/texture_03.png",
+      "Yuuri.2048/texture_04.png"
+    ],
+    "Physics": "Yuuri.physics3.json",
+    "DisplayInfo": "Yuuri.cdi3.json",
+    "Expressions": [
+      {
+        "Name": "Background",
+        "File": "expressions/Background.exp3.json"
+      },
+      {
+        "Name": "BirdD",
+        "File": "expressions/BirdD.exp3.json"
+      },
+      {
+        "Name": "BirdUP",
+        "File": "expressions/BirdUP.exp3.json"
+      },
+      {
+        "Name": "Dark",
+        "File": "expressions/Dark.exp3.json"
+      },
+      {
+        "Name": "FaceRed",
+        "File": "expressions/FaceRed.exp3.json"
+      },
+      {
+        "Name": "HandLB",
+        "File": "expressions/HandLB.exp3.json"
+      },
+      {
+        "Name": "HandRB",
+        "File": "expressions/HandRB.exp3.json"
+      },
+      {
+        "Name": "Headdress",
+        "File": "expressions/Headdress.exp3.json"
+      },
+      {
+        "Name": "Heart",
+        "File": "expressions/Heart.exp3.json"
+      },
+      {
+        "Name": "Sweat",
+        "File": "expressions/Sweat.exp3.json"
+      },
+      {
+        "Name": "Tear",
+        "File": "expressions/Tear.exp3.json"
+      }
+    ],
+    "Motions": {
+      "Idle": [
+        {
+          "File": "motions/idle.motion3.json",
+          "FadeInTime": 0.6,
+          "FadeOutTime": 0.6
+        }
+      ],
+      "Tap": [
+        {
+          "File": "motions/animation.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "motions/wave.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        }
+      ]
+    }
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": [
+        "ParamMouthOpenY"
+      ]
+    },
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": [
+        "ParamEyeLOpen",
+        "ParamEyeROpen"
+      ]
+    }
+  ],
+  "HitAreas": []
+}

@@ -30,7 +30,7 @@ interface Live2DModelLike {
   getBounds(): { x: number; y: number; width: number; height: number }
   motion(group: string, index?: number): Promise<unknown>
   expression(name?: string): Promise<unknown>
-  destroy(): void
+  destroy(options?: { texture?: boolean; baseTexture?: boolean }): void
 }
 
 declare global {
@@ -261,7 +261,14 @@ class Live2DRenderer implements PetRenderer {
   destroy(): void {
     this.observer.disconnect()
     try {
-      this.model.destroy()
+      // 必须显式要求一并销毁贴图。库的 destroy() 默认只销毁模型骨架，贴图会继续留在
+      // Pixi 的全局 TextureCache 里 —— 于是「切换形象」变成只增不减：实测把 6 个形象
+      // 都看过一遍后，渲染进程多背了约 490 MB 的解码贴图，且永远不会释放。
+      //
+      // 加 texture + baseTexture 两个标志才能既释放解码内存，又把缓存键一起清掉
+      // （Pixi 的 Texture.destroy(true) 内部会 removeFromCache）。漏掉任何一半都会出问题：
+      // 只销毁不清键，下次切回这个形象会拿到一张已经销毁的贴图，直接渲染成空白。
+      this.model.destroy({ texture: true, baseTexture: true })
       this.app.destroy(true)
     } catch (error) {
       console.warn('[pet] 销毁 Live2D 渲染器时出错：', error)

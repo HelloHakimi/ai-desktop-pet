@@ -1,0 +1,25 @@
+{
+    "Type": "Live2D Expression",
+    "Parameters": [
+        {
+            "Id": "ParamCheek66",
+            "Value": 1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek62",
+            "Value": -0.7912262678146362,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek63",
+            "Value": -1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek64",
+            "Value": -0.6534003019332886,
+            "Blend": "Add"
+        }
+    ]
+}

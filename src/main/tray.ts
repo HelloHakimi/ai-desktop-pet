@@ -2,7 +2,8 @@
 import { Menu, Tray, app, nativeImage, shell } from 'electron'
 import { join } from 'node:path'
 import { reloadPet } from './actions'
-import { configPath } from './config'
+import { configPath, loadConfig, updateModelSelection } from './config'
+import { listModels, modelsRoot, type PetModel } from './models'
 import {
   applyAlwaysOnTop,
   isAlwaysOnTop,
@@ -20,6 +21,13 @@ export function createTray(): Tray {
 
   instance.setToolTip('AI 桌宠')
   rebuildMenu()
+
+  // 模型没出现在菜单里时，这两行能直接区分「目录扫错了」和「清单没写对」
+  const models = listModels()
+  console.log(`[tray] 模型目录：${modelsRoot()}`)
+  console.log(
+    `[tray] 可用形象 ${models.length} 个：${models.map((m) => m.name).join('、') || '（无）'}`
+  )
 
   return instance
 }
@@ -49,6 +57,7 @@ function rebuildMenu(): void {
       }
     },
     { type: 'separator' },
+    { label: '切换形象', submenu: modelEntries() },
     { label: '重新加载形象', click: () => reloadPet() },
     {
       label: '打开配置文件…',
@@ -65,6 +74,63 @@ function rebuildMenu(): void {
   ])
 
   tray.setContextMenu(menu)
+}
+
+/**
+ * 「切换形象」子菜单。
+ *
+ * 每次都重新扫目录：用户往模型文件夹里丢一个新模型后，不用重启就能在菜单里看到。
+ * 模型数量是个位数，这点磁盘开销可以忽略。
+ */
+function modelEntries(): Electron.MenuItemConstructorOptions[] {
+  const models = listModels()
+  const current = loadConfig().model.path
+
+  if (models.length === 0) {
+    return [
+      { label: '（模型文件夹里没有可用的模型）', enabled: false },
+      { type: 'separator' },
+      { label: '打开模型文件夹…', click: () => openModelsFolder() }
+    ]
+  }
+
+  const entries: Electron.MenuItemConstructorOptions[] = models.map((model) => ({
+    label: model.name,
+    type: 'radio',
+    checked: model.path === current,
+    click: () => selectModel(model)
+  }))
+
+  // 配置指向了一个不在列表里的路径时，把现状显示出来，
+  // 否则用户会看到一组全都没勾选的单选项而不知道当前到底在用哪个。
+  if (!models.some((model) => model.path === current)) {
+    entries.push(
+      { type: 'separator' },
+      { label: `当前：${current}（文件缺失）`, enabled: false }
+    )
+  }
+
+  entries.push(
+    { type: 'separator' },
+    { label: '打开模型文件夹…', click: () => openModelsFolder() }
+  )
+  return entries
+}
+
+function selectModel(model: PetModel): void {
+  if (loadConfig().model.path === model.path) return
+
+  updateModelSelection({ path: model.path, idleMotionGroup: model.idleMotionGroup })
+  reloadPet()
+  // 重建菜单让勾选状态立刻跟上（reloadPet 不会碰菜单）
+  rebuildMenu()
+  console.log(`[tray] 已切换到形象：${model.name}`)
+}
+
+function openModelsFolder(): void {
+  void shell.openPath(modelsRoot()).then((error) => {
+    if (error) console.error(`[tray] 打开模型文件夹失败：${error}`)
+  })
 }
 
 /**

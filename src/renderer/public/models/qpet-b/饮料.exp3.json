@@ -1,0 +1,60 @@
+{
+    "Type": "Live2D Expression",
+    "Parameters": [
+        {
+            "Id": "hongjiubei",
+            "Value": 1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek56",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek62",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek63",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek64",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek65",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek66",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek67",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamCheek68",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "kafeibei",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "hongchabei",
+            "Value": 0.0,
+            "Blend": "Add"
+        }
+    ]
+}

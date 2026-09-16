@@ -87,8 +87,8 @@ def main() -> None:
     print(f"\n贴图边长   : {old_edge} -> {edge}")
     print(f"目录       : {tex_dir.name}/ -> {new_dir.name}/")
     print(f"文件体积   : {before / 1024 / 1024:.1f} MB -> {after / 1024 / 1024:.1f} MB")
-    print(f"解码驻留   : 约 {5 * int(old_edge) ** 2 * 4 / 1024 / 1024:.0f} MB -> "
-          f"{5 * int(edge) ** 2 * 4 / 1024 / 1024:.0f} MB（按 5 张贴图估算）")
+    print(f"解码驻留   : 约 {len(pngs) * int(old_edge) ** 2 * 4 / 1024 / 1024:.0f} MB -> "
+          f"{len(pngs) * int(edge) ** 2 * 4 / 1024 / 1024:.0f} MB（按 {len(pngs)} 张贴图估算）")
     print(f"已改引用   : {', '.join(patched) if patched else '（无）'}")
 
 

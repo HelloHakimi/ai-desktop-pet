@@ -2,6 +2,7 @@
   "_readme": [
     "这是配置示例。实际生效的配置在 userData 目录下（托盘菜单「打开配置文件…」可直接打开），",
     "也可以用环境变量 PET_CONFIG 指向本文件：PET_CONFIG=./pet.config.example.json npm run dev",
+    "换形象不必手改这里：托盘菜单「切换形象」选一下就写回了 model.path 与 idleMotionGroup。",
     "API Key 建议用环境变量 PET_API_KEY 注入，不要写进任何会被提交的文件。"
   ],
   "window": {

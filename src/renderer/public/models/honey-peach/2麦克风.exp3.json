@@ -1,0 +1,30 @@
+{
+    "Type": "Live2D Expression",
+    "Parameters": [
+        {
+            "Id": "Param3hua",
+            "Value": 1.0,
+            "Blend": "VTS_Add"
+        },
+        {
+            "Id": "Paramxx2",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "Param4xx",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "Paramsan",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "Paramsa",
+            "Value": 0.0,
+            "Blend": "Add"
+        }
+    ]
+}

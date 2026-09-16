@@ -75,9 +75,10 @@ src/
 │   ├── index.ts             # 入口：单实例、启动流程
 │   ├── pet-window.ts        # 透明置顶窗 + 拖动 + 点击穿透
 │   ├── protocol.ts          # app:// 自定义协议（本地模型资源的加载通道）
-│   ├── tray.ts              # 托盘菜单
+│   ├── tray.ts              # 托盘菜单（含「切换形象」子菜单）
 │   ├── actions.ts           # 托盘与渲染层共用的动作（重载配置等）
-│   ├── config.ts            # 配置 IO（默认值/模板生成/环境变量覆盖）
+│   ├── models.ts            # 扫模型目录，生成形象清单
+│   ├── config.ts            # 配置 IO（默认值/模板生成/环境变量覆盖/写回）
 │   ├── ipc.ts               # IPC 处理，校验渲染层输入
 │   └── ai/                  # LLM Provider 抽象 + OpenAI 兼容实现
 ├── preload/                 # 只暴露收窄过的 window.pet API
@@ -118,7 +119,7 @@ src/
 
 ## 启用 Live2D
 
-形象（`Blue cat`，模型 39 MB）已经在仓库里了，只需要补一步：获取 Cubism Core。
+形象已经在仓库里了（6 个，共 95 MB），只需要补一步：获取 Cubism Core。
 
 ```bash
 # Cubism Core 由官方单独分发（有再分发限制），仓库不含此文件
@@ -128,9 +129,6 @@ npm run setup:live2d
 装好后从托盘菜单点「重新加载形象」即可生效，**不用重启** —— 渲染层不会把「缺少 Core」这个
 失败结果缓存下来，就是为了让这条最自然的路径走得通。
 
-想换成别的模型：把资源放进 `src/renderer/public/models/<名称>/`，再把配置里的
-`model.path` 改成 `<名称>/xxx.model3.json`，点「重新加载形象」。
-
 `model.mode` 支持三种取值 ——
 
 - `auto`（默认）：能跑 Live2D 就跑，否则静默降级为占位形象
@@ -139,31 +137,82 @@ npm run setup:live2d
 
 只支持 Cubism 4/5（`.model3.json` + `.moc3`），Cubism 2.1 的 `.model.json` 未接入。
 
-### 关于 Blue cat 这份模型
+### 切换形象
 
-它原本是给 VTube Studio 用的，动作和表情登记在 `Blue cat.vtube.json` 里，而这份文件
-**`pixi-live2d-display` 不读**。所以 `model3.json` 被补齐了三处，否则模型只是个不会眨眼、
+托盘菜单 →「切换形象」→ 选一个。选中项前面会打点，选择会写回配置文件，重启后保持。
+
+菜单里的形象是**每次打开菜单时扫目录**得到的，不是在代码里写死一份列表 ——
+往模型文件夹里丢一个新模型，不用改代码、不用重新构建、不用重启，菜单里就会出现。
+（「切换形象 → 打开模型文件夹…」可以直接在访达里打开那个目录。）
+
+仓库里现在有 6 个形象：
+
+| 目录 | 菜单显示名 | 贴图 | 动作 | 表情 | 大小 |
+| --- | --- | --- | --- | --- | --- |
+| `blue-cat/` | 水色小猫咪 | 5×2048 | 1 | 22 | 25 MB |
+| `yuuri/` | Yuuri | 5×2048 | 3 | 11 | 12 MB |
+| `cotton/` | 晚安少女 | 3×2048 | 1 | 14 | 13 MB |
+| `honey-peach/` | 桃瑟古风 | 14×2048 | 2 | 23 | 36 MB |
+| `qpet-a/` | Q版 A | 1×2048 | 12 | 40 | 4.2 MB |
+| `qpet-b/` | Q版 B | 1×2048 | 15 | 44 | 4.8 MB |
+
+每个模型目录里的 `pet-model.json` 决定菜单里显示的名字和待机动作组名：
+
+```json
+{ "name": "水色小猫咪", "idleMotionGroup": "Idle" }
+```
+
+改这个文件就能改名，不用碰代码。
+
+### 装一个新模型
+
+模型大多是给 VTube Studio 用的，直接拷过来会得到一个不会动、不眨眼、表情全空的花瓶 ——
+动作和表情登记在 `.vtube.json` 里，而 `pixi-live2d-display` 不读那个文件。
+`scripts/install-model.py` 负责把这层信息搬过去：
+
+```bash
+python3 scripts/install-model.py <源模型目录> <目标目录名> --name "菜单里的名字"
+# 例：python3 scripts/install-model.py /tmp/extract/Yuuri yuuri --name "Yuuri"
+```
+
+它做四件事：只挑运行时需要的文件复制（跳过 UI 图、插画、psd、图标）→ 调
+`downscale-textures.py` 降采样贴图 → 从 `.vtube.json` 补全 `model3.json` 的
+`Motions` / `Expressions` / `Groups` → 写 `pet-model.json`。中途失败会把半个目录删干净，
+不会在托盘里留一个加载不出来的残骸。
+
+源目录里的文件名建议是 UTF-8。从 GBK 编码的 Windows 压缩包里解出来的话，
+用 `ditto -x -k` 或 Python 的 `zipfile` 显式按 GBK 解码，别用 `unzip`（会解出乱码文件名）。
+
+### 这几份模型都补了什么
+
+它们原本都是给 VTube Studio 用的，动作和表情登记在各自的 `.vtube.json` 里，而这份文件
+**`pixi-live2d-display` 不读**。所以每个 `model3.json` 都被补齐了三处，否则模型只是不会眨眼、
 不会动、也没有表情的静态立绘：
 
-| 补的内容 | 作用 |
-| --- | --- |
-| `FileReferences.Motions.Idle` → `待机动画.motion3.json` | 让它有 4 秒循环的待机动作 |
-| `FileReferences.Expressions`（22 个） | 让 `setExpression('哭哭')` 这类调用能找到表情 |
-| `Groups` 里的 `EyeBlink` / `LipSync` 参数 Id | 让它会眨眼；口型留给里程碑 3 |
+| 补的内容 | 来源 | 作用 |
+| --- | --- | --- |
+| `FileReferences.Motions.Idle` | vtube 的 `FileReferences.IdleAnimation` | 循环待机动作 |
+| `FileReferences.Motions.Tap` | 其余 `*.motion3.json` | 打包成一组，留给将来「点击随机播一个」 |
+| `FileReferences.Expressions` | vtube 的 `ToggleExpression` 热键表 | 让 `setExpression('哭哭')` 这类调用能找到表情 |
+| `Groups` 的 `EyeBlink` / `LipSync` | vtube 参数表里 `Input` 为 `EyeOpen*` / `MouthOpen` 的项 | 让它会眨眼；口型留给里程碑 3 |
 
-改动是**纯增量**的（只加不改原有字段），想回到原版把这 `Motions` / `Expressions` / `Groups`
-三段删掉即可。
+`Idle` 这个组名不能改：`pixi-live2d-display` 内部用 `groups.idle = "Idle"` 识别待机动作，
+换成别的名字它就不接管了。
 
-### 贴图降采样：常驻内存 924 MB → 582 MB
+对 `model3.json` 的改动是**纯增量**的（只加不改原有字段），想回到原版把 `Motions` /
+`Expressions` / `Groups` 三段删掉即可。原始压缩包都在 `~/.Trash/` 里还没清空。
 
-模型自带的贴图是 5 张 **4096×4096**（解码驻留约 320 MB），但形象只渲染在 245×460 的区域里，
-实际只需要约 2.25 texel/像素 —— 4096 有一半以上的分辨率是白解码、白占显存的。
+### 贴图降采样：从 4096/8192 降到 2048
 
+这批模型自带的贴图是 4096²，`Q版` 那两个更是 **8192²** —— 单张 8192² 解码后就要 256 MB 显存。
+`桃瑟古风` 一家有 14 张贴图，原样加载约 896 MB。形象只渲染在 320×460 的窗口里，
+这些分辨率有一大半是白解码、白占显存。
+
+```bash
+python3 scripts/downscale-textures.py <模型目录> 2048
 ```
-python3 scripts/downscale-textures.py src/renderer/public/models/blue-cat 2048
-```
 
-实测（同机同配置，只改贴图分辨率）：
+Blue cat 的实测对比（同机同配置，只改贴图分辨率）：
 
 | | 4096（原始） | 2048（当前） |
 | --- | --- | --- |
@@ -175,9 +224,6 @@ python3 scripts/downscale-textures.py src/renderer/public/models/blue-cat 2048
 画质验证方式是**先把待机动作和眨眼冻住**再逐像素比 —— 第一版对比得出「15% 像素不同」是假象，
 那比的是动画的不同帧，不是画质。冻住之后：平均通道差 1.14/255，差异集中在轮廓的亚像素抗锯齿，
 3 倍放大目视无可见差别。
-
-想恢复原始贴图：`~/Trash/水色小猫咪.zip` 里还有原图（解压后跑一次
-`downscale-textures.py` 的反向操作，或直接把 `.4096` 目录和 `model3.json` 的引用改回去）。
 
 ## 接入大模型
 
@@ -247,6 +293,13 @@ PixiJS 6 内部用 `new Function()` 生成 uniform 同步代码，会被 `script
 | 本地资源加载 | 实测 `fetch` 在 `app://` 下可用（能取到文件内容），缺失文件返回可判断的 404，畸形转义返回 400 |
 | 密钥隔离 | CDP 实测 `getConfig()` 返回的对象**不含 `ai` 段** |
 | dev 模式 | 起 Vite server + Electron，CDP 实测页面挂载 canvas、9 个 `window.pet` 方法齐全、窗口尺寸与配置一致 |
+| 6 个形象逐个渲染 | 托盘逐个切换后逐个截图目视确认；每个形象引用的资源（model3.json / moc3 / 贴图 / physics3 / 动作）全部 200，非 2xx 为 0，控制台零报错 |
+| 形象清单 | 主进程 inspector 实测菜单结构：6 个 radio 项 + 当前项打点正确 + 分隔线 + 「打开模型文件夹…」 |
+| 切换的真实性与持久化 | 通过菜单项自身的 click 处理器触发切换（不是绕过菜单直接改配置），实测配置文件同步写入 `model.path` 与 `idleMotionGroup`，且 `_readme` 与 `ai` 段原样保留 |
+| 配置指向失效模型 | 把 `yuuri/` 目录改名后重建菜单，实测出现「当前：yuuri/yuuri.model3.json（文件缺失）」的不可点条目，而不是一组全未勾选的单选项 |
+| 切换形象的贴图回收 | **修复前**贴图只增不减，浏览完 6 个形象后 Pixi 的 `TextureCache` 累积全部 29 张；**修复后**实测缓存数严格等于当前形象的贴图张数（5 / 14 / 3 / 1 / 5），切回后仍能正常渲染 |
+| 切换耗时 | 5 组切换实测 76–104 ms（均值 96 ms），每次都核实了实际加载的确实是目标形象（按贴图缓存内容判定），不是只看 canvas 数量 |
+| 反复切换不泄漏 | 30 次切换实测：渲染进程 RSS 爬到 526 MB 后**完全走平**（后 20 次只涨 1 MB），GPU 恒定 90 MB，JS 堆恒定 61 MB |
 
 **未能自动验证、需要你亲手确认的一项**：窗口拖动。它依赖主进程轮询真实鼠标位置，
 而自动化注入的鼠标事件不会移动系统光标，所以只能由人拖一下确认。
@@ -280,6 +333,22 @@ Pixi ticker 继续跑。实测一次点击后 `mountCount` 从 1 变 3、DOM 里
 `loadCubismCore()` 把 promise 缓存了起来，失败也缓存。于是「没装 Core → 看到提示 → 跑 setup:live2d →
 点重新加载」这条最自然的路径永远走不通，只能重启应用。另外 404 属于 Chromium 会启发式缓存的响应，
 重试还得绕开缓存。修法：失败不缓存 + 重试带变化的 query + 失败时摘掉死 script 节点。
+
+**切换形象时贴图只增不减（这轮抓到的）**
+`pixi-live2d-display` 的 `model.destroy()` 默认**不碰贴图**，而 PixiJS 的贴图是按 URL 存在
+全局 `TextureCache` 里的。于是每切换到一个新形象就把它的贴图永久留在缓存里：实测把 6 个形象
+都看过一遍后，缓存里攒了全部 29 张贴图（约 490 MB 解码数据），而且永远不会释放。
+
+修法是给 `destroy()` 传 `{ texture: true, baseTexture: true }`。这两个标志缺一不可 ——
+Pixi 的 `Texture.destroy(true)` 内部会先 `removeFromCache` 再销毁 baseTexture；
+只销毁不清缓存键的话，下次切回这个形象会拿到一张已经销毁的贴图，直接渲染成空白。
+修复后实测缓存数严格等于当前形象的贴图张数（5 / 14 / 3 / 1 / 5），切回后渲染正常。
+
+**形象清单扫错了目录（dev 专属）**
+`modelsRoot()` 一开始固定按 `__dirname/../renderer/models` 找模型，但 dev 模式下渲染层由
+Vite dev server 提供、模型来自 `src/renderer/public/models`，`out/renderer/models` 只是上一次
+build 的残影。症状是：新加的模型渲染层明明加载得出来，托盘菜单里却看不见。
+改为按 `ELECTRON_RENDERER_URL` 是否存在来区分两种运行方式。
 
 **其余小问题**
 - 窗口被关掉后（默认菜单的 Cmd+W）托盘「显示 / 隐藏」变成点了没反应的死按钮 → 改为自动重建窗口。
@@ -330,6 +399,11 @@ chunk**（产物里能看到 `pixi-*.js`、`cubism4.es-*.js`），运行时不�
 - 窗口尺寸改动需要重启才能生效（透明窗重建成本高，暂未做热应用）。
 - 点击穿透的命中判定用的是模型包围盒（内缩 15%），不是逐像素 alpha 判定；
   形象边缘的透明区域仍会挡住鼠标。逐像素判定留待后续优化。
+- 切换形象会重建整个 Pixi 应用（连带一个新的 WebGL 上下文），但实测**很快**：
+  从菜单点击到新形象渲染就绪平均 96 ms（含自动化调用的进程启动开销，真实值更低），
+  因为资源走 HTTP 缓存、只需重新解码。代价是 Chromium 不会把峰值期的内存还给系统 ——
+  看过 `桃瑟古风`（14 张贴图）之后渲染进程停在约 526 MB 不再下降，即使切回小模型也一样。
+  这是水位不是泄漏（30 次切换实测已走平），要更低只能把贴图再降一档或改成复用同一个 Pixi 实例。
 - 对话只实现了非流式一次性请求，UI 未接入。
 - Live2D 只支持 Cubism 4/5（`.model3.json` + `.moc3`），Cubism 2.1 未接入。
 
@@ -352,6 +426,7 @@ chunk**（产物里能看到 `pixi-*.js`、`cubism4.es-*.js`），运行时不�
 | `npm run setup:live2d` | 下载 Cubism Core |
 | `npm run make:icon` | 重新生成应用图标（`build/icon.icns`） |
 | `python3 scripts/downscale-textures.py <模型目录> <边长>` | 贴图降采样（省内存，需 macOS 自带 sips） |
+| `python3 scripts/install-model.py <源目录> <目标名> --name "显示名"` | 装一个新形象：挑文件 + 降采样 + 补全 model3.json + 写清单 |
 | `npm run ai:ping` | 模型连通性自检 |
 | `python3 scripts/make-tray-icon.py` | 重新生成托盘图标 |
 

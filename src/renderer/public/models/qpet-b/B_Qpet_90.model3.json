@@ -1,0 +1,287 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "B_Qpet_90.moc3",
+    "Textures": [
+      "B_Qpet_90.2048/texture_00.png"
+    ],
+    "Physics": "B_Qpet_90.physics3.json",
+    "DisplayInfo": "B_Qpet_90.cdi3.json",
+    "Motions": {
+      "Idle": [
+        {
+          "File": "idle.motion3.json",
+          "FadeInTime": 0.6,
+          "FadeOutTime": 0.6
+        }
+      ],
+      "Tap": [
+        {
+          "File": "C.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "V.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "X.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "Z.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "aidale.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "chishupian.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "chuipaopao.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "feifeiji.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "hecha.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "hehongjiu.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "jiabing.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "jiabing_hong.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "wankele.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        },
+        {
+          "File": "空格.motion3.json",
+          "FadeInTime": 0.4,
+          "FadeOutTime": 0.4
+        }
+      ]
+    },
+    "Expressions": [
+      {
+        "Name": "1",
+        "File": "1.exp3.json"
+      },
+      {
+        "Name": "C",
+        "File": "C.exp3.json"
+      },
+      {
+        "Name": "V",
+        "File": "V.exp3.json"
+      },
+      {
+        "Name": "X",
+        "File": "X.exp3.json"
+      },
+      {
+        "Name": "Z",
+        "File": "Z.exp3.json"
+      },
+      {
+        "Name": "兔兔贴纸",
+        "File": "兔兔贴纸.exp3.json"
+      },
+      {
+        "Name": "右键",
+        "File": "右键.exp3.json"
+      },
+      {
+        "Name": "吐魂",
+        "File": "吐魂.exp3.json"
+      },
+      {
+        "Name": "呆呆眼",
+        "File": "呆呆眼.exp3.json"
+      },
+      {
+        "Name": "圆眼镜",
+        "File": "圆眼镜.exp3.json"
+      },
+      {
+        "Name": "墨镜",
+        "File": "墨镜.exp3.json"
+      },
+      {
+        "Name": "大哭",
+        "File": "哭.exp3.json"
+      },
+      {
+        "Name": "左键",
+        "File": "左键.exp3.json"
+      },
+      {
+        "Name": "开心兴奋",
+        "File": "开心兴奋.exp3.json"
+      },
+      {
+        "Name": "心跳",
+        "File": "心跳.exp3.json"
+      },
+      {
+        "Name": "悲伤",
+        "File": "悲伤.exp3.json"
+      },
+      {
+        "Name": "情绪花花",
+        "File": "情绪花花.exp3.json"
+      },
+      {
+        "Name": "感叹号",
+        "File": "感叹号.exp3.json"
+      },
+      {
+        "Name": "戴帽子",
+        "File": "戴帽子.exp3.json"
+      },
+      {
+        "Name": "拿起红酒",
+        "File": "饮料.exp3.json"
+      },
+      {
+        "Name": "数位屏",
+        "File": "数位屏.exp3.json"
+      },
+      {
+        "Name": "方眼镜",
+        "File": "方眼镜.exp3.json"
+      },
+      {
+        "Name": "星星眼",
+        "File": "星星眼.exp3.json"
+      },
+      {
+        "Name": "晕晕",
+        "File": "晕晕.exp3.json"
+      },
+      {
+        "Name": "椭圆眼镜",
+        "File": "椭圆眼镜.exp3.json"
+      },
+      {
+        "Name": "流汗",
+        "File": "流汗.exp3.json"
+      },
+      {
+        "Name": "爆肝",
+        "File": "爆肝.exp3.json"
+      },
+      {
+        "Name": "爪垫灰色/黄色",
+        "File": "爪垫.exp3.json"
+      },
+      {
+        "Name": "爱心眼",
+        "File": "爱心眼.exp3.json"
+      },
+      {
+        "Name": "猫猫贴纸",
+        "File": "猫猫贴纸.exp3.json"
+      },
+      {
+        "Name": "生气",
+        "File": "生气.exp3.json"
+      },
+      {
+        "Name": "眼罩L",
+        "File": "眼罩L.exp3.json"
+      },
+      {
+        "Name": "空格",
+        "File": "空格.exp3.json"
+      },
+      {
+        "Name": "红酒",
+        "File": "红酒.exp3.json"
+      },
+      {
+        "Name": "红酒和咖啡切替",
+        "File": "咖啡＆红茶.exp3.json"
+      },
+      {
+        "Name": "红酒和红茶切替",
+        "File": "红茶.exp3.json"
+      },
+      {
+        "Name": "脸红",
+        "File": "脸红.exp3.json"
+      },
+      {
+        "Name": "落笔",
+        "File": "落笔.exp3.json"
+      },
+      {
+        "Name": "蝴蝶结贴纸",
+        "File": "蝴蝶结贴纸.exp3.json"
+      },
+      {
+        "Name": "调皮",
+        "File": "调皮.exp3.json"
+      },
+      {
+        "Name": "闭眼口水",
+        "File": "闭眼口水.exp3.json"
+      },
+      {
+        "Name": "问号",
+        "File": "问号.exp3.json"
+      },
+      {
+        "Name": "阴暗",
+        "File": "阴暗.exp3.json"
+      },
+      {
+        "Name": "（加购A款）JK服",
+        "File": "切换JK服.exp3.json"
+      }
+    ]
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": [
+        "ParamMouthOpenY"
+      ]
+    },
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": [
+        "ParamEyeLOpen",
+        "ParamEyeROpen"
+      ]
+    }
+  ]
+}
