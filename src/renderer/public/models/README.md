@@ -65,6 +65,22 @@ python3 scripts/install-model.py <源模型目录> <目标目录名> --name "菜
 `idleMotionGroup` 建议保持 `"Idle"`：`pixi-live2d-display` 内部用 `groups.idle = "Idle"`
 识别待机动作，只有在待机动作播完之后它会自动接上下一个。
 
+## 表情怎么试
+
+托盘菜单 →「试个表情」。列的就是这个模型 `model3.json` 里 `FileReferences.Expressions` 登记的名字，
+换形象菜单跟着换；末尾有「随机一个」和「还原默认」。
+
+所以**想让一个表情能被试到，只要把它登记进 `model3.json`**：
+
+```json
+"Expressions": [
+  { "Name": "脸红", "File": "脸红.exp3.json" }
+]
+```
+
+`Name` 是渲染层查找用的键，可以任意取（不必等于文件名）。`scripts/install-model.py`
+就是从 `.vtube.json` 的热键表里自动生成这一段，并顺手把 `Motions` / `Groups` 一起补上。
+
 ## 还没有模型？
 
 先用占位形象即可 —— 把 `model.mode` 设为 `"placeholder"`，或者在没有任何模型文件时保持 `"auto"`，
@@ -72,11 +88,12 @@ python3 scripts/install-model.py <源模型目录> <目标目录名> --name "菜
 
 ## 排查
 
-主进程启动时会打印两行日志，用来区分「目录扫错了」和「清单没写对」：
+主进程启动时会打印三行日志，用来区分「目录扫错了」「清单没写对」和「表情没登记上」：
 
 ```
 [tray] 模型目录：/Users/zwj/桌宠/src/renderer/public/models
 [tray] 可用形象 6 个：水色小猫咪、晚安少女、桃瑟古风、Q版 A、Q版 B、Yuuri
+[tray] 当前形象：qpet-a/A_Qpet_90.model3.json（表情 40 个）
 ```
 
 注意 **dev 与打包后扫的不是同一个目录**：dev 下是源码里的 `src/renderer/public/models`

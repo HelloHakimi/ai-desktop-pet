@@ -1,6 +1,6 @@
 /** 托盘菜单与渲染层共用的「动作」层，避免两边各写一份逻辑 */
 import { toRendererConfig } from '@shared/config'
-import { IPC } from '@shared/ipc'
+import { IPC, type ExpressionCommand } from '@shared/ipc'
 import { configPath, loadConfig } from './config'
 import { getPetWindow } from './pet-window'
 
@@ -19,4 +19,16 @@ export function reloadPet(): void {
   if (!win) return
   win.webContents.send(IPC.configChanged, toRendererConfig(config))
   console.log(`[pet] 已重新加载配置：${configPath()}`)
+}
+
+/**
+ * 让当前形象换个表情。
+ *
+ * 只转发、不在主进程记状态：表情是渲染层的事，主进程这边没有模型，也没法知道
+ * 某个名字到底存不存在 —— 校验留给能真正查表的那一层，失败原因也才说得清。
+ */
+export function applyExpression(command: ExpressionCommand): void {
+  const win = getPetWindow()
+  if (!win) return
+  win.webContents.send(IPC.expression, command)
 }

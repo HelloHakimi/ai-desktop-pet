@@ -48,6 +48,10 @@ export class PlaceholderRenderer implements PetRenderer {
     // no-op：占位形象不支持表情
   }
 
+  resetExpression(): void {
+    // no-op：占位形象不支持表情
+  }
+
   destroy(): void {
     this.element.remove()
   }

@@ -30,6 +30,26 @@ interface Live2DModelLike {
   getBounds(): { x: number; y: number; width: number; height: number }
   motion(group: string, index?: number): Promise<unknown>
   expression(name?: string): Promise<unknown>
+  /**
+   * 只为「还原默认表情」和「查名字是否存在」而开的一条路。
+   *
+   * 库的 Live2DModel 上只暴露了 expression(name)，既没有还原方法、也没法判断一个名字
+   * 到底在不在。这两件事在 ExpressionManager 上，而 internalModel → motionManager →
+   * expressionManager 这三层在库的类型声明里都是 public 的，不算掏私有字段。
+   * expressionManager 是可选的：模型完全没有表情时它不存在。
+   */
+  internalModel?: {
+    motionManager?: {
+      expressionManager?: {
+        resetExpression(): void
+        /** 名字查不到时返回 -1 */
+        getExpressionIndex(name: string): number
+        /** 下面两个是公开字段，用 unknown 收着 —— 这个文件刻意不引入库的类型声明 */
+        defaultExpression?: unknown
+        currentExpression?: unknown
+      }
+    }
+  }
   destroy(options?: { texture?: boolean; baseTexture?: boolean }): void
 }
 
@@ -252,10 +272,63 @@ class Live2DRenderer implements PetRenderer {
     })
   }
 
-  setExpression(name: string): void {
-    void this.model.expression(name).catch(() => {
-      /* 表情不存在时静默忽略 */
-    })
+  /** 表情管理器；模型完全没有表情时返回 undefined */
+  private expressionManager(): NonNullable<
+    NonNullable<Live2DModelLike['internalModel']>['motionManager']
+  >['expressionManager'] {
+    return this.model.internalModel?.motionManager?.expressionManager
+  }
+
+  /**
+   * 切换表情。不传名字表示随机抽一个。
+   *
+   * 这里不能像 playMotion 那样静默失败：库对「名字不存在」和「这个名字已经是当前表情」
+   * 这两种情况**都** resolve(false)，光看返回值区分不出来。名字是主进程扫模型文件生成的
+   * 菜单传过来的，正常情况下必然存在，所以先自己查一次表 —— 否则用户点了没反应时，
+   * 提示会把「你已经套着这个表情了」误报成「这个表情不存在」。
+   */
+  setExpression(name?: string): void {
+    const manager = this.expressionManager()
+
+    if (name !== undefined && manager && manager.getExpressionIndex(name) < 0) {
+      console.warn(`[pet] 这个形象没有名为「${name}」的表情`)
+      return
+    }
+
+    void this.model
+      .expression(name)
+      .then((applied) => {
+        if (applied === false) {
+          console.info(`[pet] 表情未变化：${name ?? '(随机)'}（已经是当前表情，或加载失败）`)
+          return
+        }
+        console.info(`[pet] 已切换表情：${name ?? '(随机)'}`)
+      })
+      .catch((error) => {
+        console.warn('[pet] 切换表情失败：', error)
+      })
+  }
+
+  /** 回到没有任何表情的默认状态 */
+  resetExpression(): void {
+    const manager = this.expressionManager()
+    if (!manager) {
+      console.info('[pet] 这个形象没有表情，无需还原')
+      return
+    }
+    try {
+      manager.resetExpression()
+      // 库的 resetExpression() 只把画面切回默认，**不更新 currentExpression**。
+      // 于是它会一直认为自己还挂着刚才那个表情：还原之后再点回同一个名字，
+      // setExpression() 会判定「已经是当前表情」直接返回 false（什么都不做）。
+      // 补上这一步，之后的套用才能正常工作。这是绕开库的实现疏漏，不是我们的状态。
+      if (manager.defaultExpression !== undefined) {
+        manager.currentExpression = manager.defaultExpression
+      }
+      console.info('[pet] 已还原默认表情')
+    } catch (error) {
+      console.warn('[pet] 还原表情失败：', error)
+    }
   }
 
   destroy(): void {

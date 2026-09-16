@@ -9,7 +9,7 @@
  * 没有也能用 —— 目录名就是显示名，待机动作组走默认值。
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, normalize, sep } from 'node:path'
 
 export interface PetModel {
   /** 目录名，稳定标识 */
@@ -20,6 +20,13 @@ export interface PetModel {
   path: string
   /** 待机动作组名，空字符串表示这个模型没有待机动作 */
   idleMotionGroup: string
+}
+
+export interface PetExpression {
+  /** 传给 setExpression() 的名字 */
+  name: string
+  /** 相对模型目录的文件路径，出错时用来定位 */
+  file: string
 }
 
 const MANIFEST = 'pet-model.json'
@@ -110,4 +117,42 @@ export function listModels(): PetModel[] {
   }
 
   return models
+}
+
+/**
+ * 读当前形象的 model3.json，取出登记的表情清单。
+ *
+ * 表情名是 model3.json 里 `FileReferences.Expressions[].Name`，渲染层按这个名字查找，
+ * 所以这里必须原样透传，不能做任何「美化」（这批模型里既有含空格的「手势 抱娃娃」，
+ * 也有和文件名对不上的「右键 → 左键.exp3.json」）。
+ */
+export function listExpressions(modelPath: string): PetExpression[] {
+  const root = normalize(modelsRoot())
+  const full = normalize(join(root, modelPath.replace(/\\/g, '/')))
+
+  // model.path 是用户可改的，config 里写 ../.. 就能读到应用目录以外的地方
+  if (full !== root && !full.startsWith(root + sep)) {
+    console.warn(`[models] 拒绝越界的 model.path：${modelPath}`)
+    return []
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(full, 'utf-8'))
+    if (typeof parsed !== 'object' || parsed === null) return []
+    const refs = (parsed as Record<string, unknown>).FileReferences
+    if (typeof refs !== 'object' || refs === null) return []
+    const list = (refs as Record<string, unknown>).Expressions
+    if (!Array.isArray(list)) return []
+
+    return list.flatMap((entry) => {
+      if (typeof entry !== 'object' || entry === null) return []
+      const raw = entry as Record<string, unknown>
+      // 名字或文件缺一个，渲染层都取不到这个表情，不如不出现在菜单里
+      if (typeof raw.Name !== 'string' || typeof raw.File !== 'string') return []
+      return [{ name: raw.Name, file: raw.File }]
+    })
+  } catch (error) {
+    console.warn(`[models] 读取表情清单失败（${full}）：`, error)
+    return []
+  }
 }

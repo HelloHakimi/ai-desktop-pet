@@ -17,8 +17,10 @@ export interface PetRenderer {
   getHitBox(): HitBox | null
   /** 播放动作（占位形象为空实现） */
   playMotion(group?: string): void
-  /** 切换表情（占位形象为空实现） */
-  setExpression(name: string): void
+  /** 切换表情；不传名字表示随机抽一个（占位形象为空实现） */
+  setExpression(name?: string): void
+  /** 回到没有任何表情的默认状态（占位形象为空实现） */
+  resetExpression(): void
   destroy(): void
 }
 

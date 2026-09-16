@@ -74,6 +74,14 @@ async function boot(): Promise<void> {
   window.pet.onModelReloaded(() => {
     void window.pet.getConfig().then(mountPet)
   })
+  window.pet.onExpression((command) => {
+    // 切换形象是异步的，这期间 current 可能是 null —— 直接丢掉比排队更合适：
+    // 用户点的是上一个形象的表情，等新形象挂上来再补放会很怪。
+    if (!current) return
+    if (command.kind === 'reset') current.resetExpression()
+    else if (command.kind === 'random') current.setExpression()
+    else current.setExpression(command.name)
+  })
 }
 
 void boot()

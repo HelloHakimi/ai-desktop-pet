@@ -6,7 +6,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { ChatMessage, ChatOptions, ChatResponse } from '@shared/ai'
 import type { RendererConfig } from '@shared/config'
-import { IPC, type DragResult, type PetApi } from '@shared/ipc'
+import { IPC, type DragResult, type ExpressionCommand, type PetApi } from '@shared/ipc'
 
 const api: PetApi = {
   getConfig: () => ipcRenderer.invoke(IPC.getConfig) as Promise<RendererConfig>,
@@ -18,6 +18,7 @@ const api: PetApi = {
     ipcRenderer.invoke(IPC.chat, messages, options) as Promise<ChatResponse>,
   onConfigChanged: (listener) => subscribe(IPC.configChanged, listener),
   onModelReloaded: (listener) => subscribe(IPC.modelReloaded, () => listener()),
+  onExpression: (listener) => subscribe<ExpressionCommand>(IPC.expression, listener),
   quit: () => ipcRenderer.send(IPC.quit)
 }
 

@@ -1,9 +1,9 @@
 /** 托盘菜单：桌宠的常规入口都收在这里（桌宠本身没有标题栏和菜单栏） */
 import { Menu, Tray, app, nativeImage, shell } from 'electron'
 import { join } from 'node:path'
-import { reloadPet } from './actions'
+import { applyExpression, reloadPet } from './actions'
 import { configPath, loadConfig, updateModelSelection } from './config'
-import { listModels, modelsRoot, type PetModel } from './models'
+import { listExpressions, listModels, modelsRoot, type PetExpression, type PetModel } from './models'
 import {
   applyAlwaysOnTop,
   isAlwaysOnTop,
@@ -13,6 +13,14 @@ import {
 } from './pet-window'
 
 let tray: Tray | null = null
+/**
+ * 上一次通过菜单套用的表情名，只用来画勾。
+ *
+ * 主进程本来不该记这种状态，但这个菜单有几十项，没有勾用户根本记不住刚点了哪个。
+ * 它与实际状态可能失配的场合只有一个：「重新加载形象」会重建渲染器、表情随之清空，
+ * 而这里不知道 —— 那种时候勾会短暂停留在旧值上，属于可接受的代价。
+ */
+let lastExpression: string | null = null
 
 export function createTray(): Tray {
   const icon = loadTrayIcon()
@@ -22,12 +30,14 @@ export function createTray(): Tray {
   instance.setToolTip('AI 桌宠')
   rebuildMenu()
 
-  // 模型没出现在菜单里时，这两行能直接区分「目录扫错了」和「清单没写对」
+  // 模型没出现在菜单里时，这几行能直接区分「目录扫错了」和「清单没写对」
   const models = listModels()
+  const current = loadConfig().model.path
   console.log(`[tray] 模型目录：${modelsRoot()}`)
   console.log(
     `[tray] 可用形象 ${models.length} 个：${models.map((m) => m.name).join('、') || '（无）'}`
   )
+  console.log(`[tray] 当前形象：${current}（表情 ${listExpressions(current).length} 个）`)
 
   return instance
 }
@@ -58,6 +68,7 @@ function rebuildMenu(): void {
     },
     { type: 'separator' },
     { label: '切换形象', submenu: modelEntries() },
+    { label: '试个表情', submenu: expressionEntries() },
     { label: '重新加载形象', click: () => reloadPet() },
     {
       label: '打开配置文件…',
@@ -122,9 +133,59 @@ function selectModel(model: PetModel): void {
 
   updateModelSelection({ path: model.path, idleMotionGroup: model.idleMotionGroup })
   reloadPet()
+  // 换了形象，上一个形象的表情勾就没有意义了
+  lastExpression = null
   // 重建菜单让勾选状态立刻跟上（reloadPet 不会碰菜单）
   rebuildMenu()
   console.log(`[tray] 已切换到形象：${model.name}`)
+}
+
+/**
+ * 「试个表情」子菜单。
+ *
+ * 表情清单从当前形象的 model3.json 现读，不缓存：切形象之后菜单必须立刻跟着变，
+ * 而缓存是这类「清单和当前对象绑定」的地方最容易出错的一环。
+ */
+function expressionEntries(): Electron.MenuItemConstructorOptions[] {
+  const expressions = listExpressions(loadConfig().model.path)
+
+  if (expressions.length === 0) {
+    return [{ label: '（当前形象没有表情）', enabled: false }]
+  }
+
+  const entries: Electron.MenuItemConstructorOptions[] = expressions.map((expression) => ({
+    label: expression.name,
+    type: 'radio',
+    checked: lastExpression === expression.name,
+    click: () => applyNamedExpression(expression)
+  }))
+
+  entries.push(
+    { type: 'separator' },
+    {
+      label: '随机一个',
+      click: () => {
+        lastExpression = null
+        applyExpression({ kind: 'random' })
+        rebuildMenu()
+      }
+    },
+    {
+      label: '还原默认',
+      click: () => {
+        lastExpression = null
+        applyExpression({ kind: 'reset' })
+        rebuildMenu()
+      }
+    }
+  )
+  return entries
+}
+
+function applyNamedExpression(expression: PetExpression): void {
+  lastExpression = expression.name
+  applyExpression({ kind: 'named', name: expression.name })
+  rebuildMenu()
 }
 
 function openModelsFolder(): void {

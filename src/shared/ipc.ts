@@ -26,9 +26,25 @@ export const IPC = {
   modelReloaded: 'pet:model-reloaded',
   /** 一次性对话（流式留待后续里程碑） */
   chat: 'ai:chat',
+  /** 主进程通知渲染层换表情（托盘「试个表情」触发） */
+  expression: 'pet:expression',
   /** 退出应用 */
   quit: 'pet:quit'
 } as const
+
+/**
+ * 表情指令。
+ *
+ * 用可辨识联合，而不是「传空字符串表示还原」这类约定 ——
+ * 表情名字本身就可能含空格和奇怪字符（这批模型里就有「手势 抱娃娃」「真 左键」），
+ * 靠哨兵值迟早会撞上。
+ */
+export type ExpressionCommand =
+  | { kind: 'named'; name: string }
+  /** 随机抽一个（这批模型自带 11~44 个表情，随机很有用） */
+  | { kind: 'random' }
+  /** 回到没有任何表情的默认状态 */
+  | { kind: 'reset' }
 
 export interface DragResult {
   /** 位移超过阈值才为 true */
@@ -45,5 +61,6 @@ export interface PetApi {
   chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResponse>
   onConfigChanged(listener: (config: RendererConfig) => void): () => void
   onModelReloaded(listener: () => void): () => void
+  onExpression(listener: (command: ExpressionCommand) => void): () => void
   quit(): void
 }
