@@ -57,9 +57,12 @@ npm run preview    # 用构建产物启动（不打包）
 `Contents/Resources/app/out/renderer/models/` 就行，不用重新打包。
 
 **`node_modules` 一律不进包。** pixi 这些已经被 Vite 打进 renderer 的 chunk 了，
-再带一份 node_modules 只是白占 36 MB。所以包里的 `Contents/Resources/app/` 只有 `out/`、
-`resources/` 和 `package.json` —— 这也是为什么图标脚本要用标准库写：
+再带一份只是白占空间（本地 `node_modules` 有 440 MB）。所以包里的 `Contents/Resources/app/`
+只有 `out/`、`resources/` 和 `package.json` —— 这也是为什么图标脚本要用标准库写：
 构建链上每多一个依赖，就多一个「换台机器跑不起来」的理由。
+
+（`package.json` 里现在**连 `dependencies` 键都没有**：三个运行时库全部已打进 chunk，
+留在 `dependencies` 只会让 electron-builder 以为需要把它们拷进包。）
 
 **关掉签名**（`identity: null`）。本机 `security find-identity` 是 0 个有效身份，
 不显式关掉的话 electron-builder 会尝试签名然后报错。
@@ -282,7 +285,8 @@ PixiJS 6 内部用 `new Function()` 生成 uniform 同步代码，会被 `script
 | Live2D 真实渲染 | 实测通过：Cubism Core 5.1.0 → CubismFramework 初始化 → 模型渲染，`形象渲染器已就绪：live2d` |
 | 模型资源完整性 | Blue cat 的 5 张贴图 / moc3 / physics3 / cdi3 / 待机动作全部 200，无加载失败；中文文件名在 `app://` 下正常解析 |
 | 动作与表情 | 隔 0.9 秒截两张图对比确认画面在动（待机动作 + 眨眼）；`setExpression('哭哭' / '心心眼' / '生气')` 逐个触发，画面均发生对应变化 |
-| 打包产物 | `npm run dist` 产出 `AI 桌宠.app`；从 .app 内启动实测渲染正常、零报错；包体 277 MB（其中 Electron 框架 230 MB，自身内容 44 MB，node_modules 未进包） |
+| 打包产物 | `npm run dist` 产出 `AI 桌宠.app`；从 .app 内启动实测渲染正常、零报错；包体 343 MB（其中 Electron 框架 233 MB，自身内容 110 MB —— 模型占 95 MB，node_modules 未进包） |
+| 打包版装模型 | 实测 .app 内的 `modelsRoot()` 定位到 `Contents/Resources/app/out/renderer/models`，6 个形象全部列出；逐个切换后每个都能正常渲染，非 2xx 为 0、控制台零报错 |
 | 打包后的配置 | 实测打包版仍读 `~/Library/Application Support/ai-desktop-pet/pet.config.json`（文件未被重建，mtime 不变），没有因为改了 productName 而换目录 |
 | 贴图降采样 | 冻住动画后逐像素对比：平均通道差 1.14/255，3 倍放大无可见差别；常驻内存实测 924 → 582 MB |
 | 依赖与打包边界 | 实测 `.app` 内没有 `node_modules`；`npm audit --omit=dev` 为 0 vulnerabilities |
