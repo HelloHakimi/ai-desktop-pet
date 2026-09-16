@@ -1,0 +1,25 @@
+/** 形象渲染器的统一契约：Live2D 与占位形象都实现它，上层不需要知道具体是哪种 */
+import type { RendererConfig } from '@shared/config'
+
+export type PetKind = 'live2d' | 'placeholder'
+
+/** 命中区域，坐标相对窗口左上角（CSS 像素） */
+export interface HitBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface PetRenderer {
+  readonly kind: PetKind
+  /** 用于点击穿透判定：返回 null 表示整窗不可命中 */
+  getHitBox(): HitBox | null
+  /** 播放动作（占位形象为空实现） */
+  playMotion(group?: string): void
+  /** 切换表情（占位形象为空实现） */
+  setExpression(name: string): void
+  destroy(): void
+}
+
+export type { RendererConfig }

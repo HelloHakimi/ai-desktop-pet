@@ -1,0 +1,36 @@
+# electron-builder 配置。用法：npm run dist
+appId: com.zwj.ai-desktop-pet
+productName: AI 桌宠
+
+directories:
+  output: dist
+  buildResources: build
+
+# 只装这三样：主进程与 preload 产物、渲染层（含 Live2D 模型）、托盘图标。
+# node_modules 一律不进包 —— pixi 这些已经被 Vite 打进 renderer 的 chunk 里了，
+# 再带一份 node_modules 只是白占几十 MB。
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+  - '!**/node_modules/**'
+
+# 不用 asar。主进程里所有资源路径都是相对 __dirname 定位的（../renderer、../../resources），
+# 打了 asar 就得再写一套指向 app.asar.unpacked 的路径改写，收益却只有「文件看起来整齐一点」。
+# 副作用正好是想要的：模型文件在 .app 里是散的，想换模型直接丢进
+# Contents/Resources/app/out/renderer/models/ 即可，不用重新打包。
+asar: false
+
+# 没有原生模块要编译，跳过 rebuild：省时间，也不用依赖本机编译工具链
+npmRebuild: false
+
+mac:
+  category: public.app-category.entertainment
+  target:
+    - target: dir
+      arch:
+        - arm64
+  icon: build/icon.icns
+  # 本机 security find-identity 显示 0 个有效签名身份。显式关掉签名，
+  # 否则 electron-builder 会尝试签名并报错。自己构建自己用不需要签名。
+  identity: null

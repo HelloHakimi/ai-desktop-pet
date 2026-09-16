@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; media-src 'self' blob:; worker-src 'self' blob:"
+    />
+    <title>AI 桌宠</title>
+  </head>
+  <body>
+    <!-- 形象挂载点：Live2D 的 canvas 或占位形象都会塞进这里 -->
+    <div id="pet-root"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

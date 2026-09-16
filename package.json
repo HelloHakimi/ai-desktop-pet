@@ -1,0 +1,34 @@
+{
+  "name": "ai-desktop-pet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI 桌宠 —— Electron + TypeScript + Live2D + OpenAI 兼容 API",
+  "author": "zwj",
+  "main": "out/main/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "dist": "npm run build && electron-builder --mac",
+    "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
+    "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "setup:live2d": "node scripts/setup-live2d.mjs",
+    "make:icon": "python3 scripts/make-app-icon.py",
+    "ai:ping": "node scripts/ai-ping.mjs"
+  },
+  "devDependencies": {
+    "@pixi/unsafe-eval": "^6.5.10",
+    "@types/node": "^22.10.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^2.3.0",
+    "pixi-live2d-display": "^0.4.0",
+    "pixi.js": "^6.5.10",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0"
+  }
+}

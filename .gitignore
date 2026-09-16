@@ -1,0 +1,28 @@
+node_modules/
+out/
+dist/
+release/
+.vite/
+*.tsbuildinfo
+
+# 本地配置（可能包含 API Key，切勿提交）
+pet.config.json
+.env
+.env.local
+
+# Live2D Cubism Core：官方单独分发、不可再分发，用 npm run setup:live2d 获取
+src/renderer/public/vendor/live2dcubismcore.min.js
+
+# build/ 下的图标：icon.icns 是打包要用的最终产物，跟 resources/trayTemplate.png 一样提交进仓库；
+# 中间产物（iconset、预览图）由 npm run make:icon 随时可再生，不入库
+build/icon.iconset/
+build/icon-preview.png
+
+# 模型原始压缩包：解出来的模型已经在 src/renderer/public/models/ 里了，
+# 这份 85 MB 的包只是原始素材备份，不该进仓库
+*.zip
+
+.DS_Store
+.idea/
+__pycache__/
+*.log

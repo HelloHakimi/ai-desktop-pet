@@ -1,0 +1,31 @@
+{
+  "_readme": [
+    "这是配置示例。实际生效的配置在 userData 目录下（托盘菜单「打开配置文件…」可直接打开），",
+    "也可以用环境变量 PET_CONFIG 指向本文件：PET_CONFIG=./pet.config.example.json npm run dev",
+    "API Key 建议用环境变量 PET_API_KEY 注入，不要写进任何会被提交的文件。"
+  ],
+  "window": {
+    "width": 320,
+    "height": 460,
+    "alwaysOnTop": true,
+    "clickThrough": true,
+    "hideDockIcon": true,
+    "modelScale": 1
+  },
+  "model": {
+    "mode": "auto",
+    "path": "blue-cat/Blue cat.model3.json",
+    "idleMotionGroup": "Idle",
+    "autoInteract": true
+  },
+  "ai": {
+    "provider": "openai-compatible",
+    "baseUrl": "https://api.deepseek.com/v1",
+    "apiKey": "",
+    "model": "deepseek-chat",
+    "systemPrompt": "你是一只住在用户桌面上的小宠物，说话简短、俏皮、有温度，每次回复不超过两句话。",
+    "temperature": 0.8,
+    "maxTokens": 512,
+    "timeoutMs": 30000
+  }
+}
