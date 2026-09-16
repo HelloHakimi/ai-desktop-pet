@@ -29,7 +29,7 @@ export interface ModelConfig {
   path: string
   /** 待机动作组名，留空则不做处理 */
   idleMotionGroup: string
-  /** 是否让模型自动跟随鼠标 */
+  /** 是否让形象的目光/头部跟随鼠标（由渲染层自己驱动，见 Live2DRenderer.lookAt） */
   autoInteract: boolean
 }
 
@@ -72,7 +72,7 @@ export const DEFAULT_CONFIG: PetConfig = {
   },
   model: {
     mode: 'auto',
-    path: 'blue-cat/Blue cat.model3.json',
+    path: 'qpet-a/A_Qpet_90.model3.json',
     idleMotionGroup: 'Idle',
     autoInteract: true
   },

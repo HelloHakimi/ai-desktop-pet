@@ -2,7 +2,8 @@
  * Live2D 渲染器（PixiJS + pixi-live2d-display）。
  *
  * 三个刻意的设计：
- * 1. Cubism Core 与模型都不进仓库 —— 官方 Cubism Core 有再分发限制，模型是美术资产。
+ * 1. Cubism Core 不进仓库（官方有再分发限制，用 `npm run setup:live2d` 单独取），
+ *    模型是美术资产、单独放在 `public/models/` 下由托盘菜单扫目录发现。
  *    两者都通过运行时探测：缺 Core、缺模型、模型损坏，都会返回带原因的结果，由上层决定降级还是报错。
  * 2. pixi.js 与 pixi-live2d-display 用动态 import，只有真的要跑 Live2D 时才加载，占位形象路径不背这个包体。
  * 3. 对模型只用结构化类型（Live2DModelLike），不引入该库的类型声明 —— 这层库升级频繁，
@@ -17,6 +18,15 @@ const CUBISM_CORE_URL = './vendor/live2dcubismcore.min.js'
 /** 命中框收窄比例：模型包围盒包含大量透明区域，直接用会挡住桌面 */
 const HIT_INSET = 0.15
 
+/**
+ * 目标帧率。
+ *
+ * 桌宠是常驻程序，而 Pixi 默认跑满 60 fps —— 实测渲染进程因此稳定占着 27% 的 CPU，
+ * 一整天下来是纯浪费。Live2D 是角色动画，30 fps 和 60 fps 在这块 320×460 的窗口里
+ * 肉眼分不出来，CPU 却能直接砍掉一半。
+ */
+const TARGET_FPS = 30
+
 type PixiApplication = InstanceType<typeof PixiNS.Application>
 
 /** 我们实际用到的 Live2DModel 能力面 */
@@ -30,6 +40,14 @@ interface Live2DModelLike {
   getBounds(): { x: number; y: number; width: number; height: number }
   motion(group: string, index?: number): Promise<unknown>
   expression(name?: string): Promise<unknown>
+  /**
+   * 让目光/头部看向舞台坐标 (x, y)（内部会换算成模型的本地坐标并做缓动）。
+   *
+   * 库自带的 autoInteract 走的是 Pixi InteractionManager → canvas 的 DOM 事件，
+   * 而我们的 canvas 是 `pointer-events: none`（见 style.css），那条链从头到尾收不到事件，
+   * 所以鼠标跟随由渲染层自己从窗口的 pointermove 驱动（见 pet/lookAt.ts）。
+   */
+  focus(x: number, y: number, instant?: boolean): void
   /**
    * 只为「还原默认表情」和「查名字是否存在」而开的一条路。
    *
@@ -152,7 +170,11 @@ export async function tryCreateLive2DRenderer(
     install(PIXI)
 
     window.PIXI = PIXI
-    const { Live2DModel } = await import('pixi-live2d-display/cubism4')
+
+    // sharedTicker 让 Application 和模型共用同一个 Ticker。默认情况下 app 有自己的 ticker、
+    // 而 pixi-live2d-display 把模型更新挂在 Ticker.shared 上，等于每帧跑两个 rAF 循环，
+    // 而且限帧得设两处才管用。共用一个之后 maxFPS 一设就能同时管住「更新模型」和「渲染」。
+    PIXI.Ticker.shared.maxFPS = TARGET_FPS
 
     app = new PIXI.Application({
       width: Math.max(host.clientWidth, 1),
@@ -160,7 +182,8 @@ export async function tryCreateLive2DRenderer(
       backgroundAlpha: 0,
       antialias: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
-      autoDensity: true
+      autoDensity: true,
+      sharedTicker: true
     })
 
     canvas = app.view as unknown as HTMLCanvasElement
@@ -168,8 +191,14 @@ export async function tryCreateLive2DRenderer(
     canvas.style.height = '100%'
     host.appendChild(canvas)
 
+    const { Live2DModel } = await import('pixi-live2d-display/cubism4')
+
+    // autoInteract 关掉：库的鼠标跟随挂在 Pixi 的 InteractionManager 上，而那个管理器听的是
+    // canvas 的 DOM 事件 —— 我们的 canvas 是 pointer-events: none，那条链收不到任何事件。
+    // 跟随改由渲染层自己从窗口的 pointermove 驱动（见 pet/lookAt.ts）。
+    // 注意别顺手把 autoUpdate 也关了：模型的 deltaTime 是靠它累加的，关了画面直接冻住。
     const model = (await Live2DModel.from(probe.url, {
-      autoInteract: config.model.autoInteract
+      autoInteract: false
     })) as unknown as Live2DModelLike
 
     app.stage.addChild(model as unknown as PixiNS.DisplayObject)
@@ -272,6 +301,19 @@ class Live2DRenderer implements PetRenderer {
     })
   }
 
+  /**
+   * 目光跟随指针。收的是窗口内的 CSS 像素坐标 —— 舞台没有额外变换，
+   * 所以它和 Pixi 的舞台坐标是同一个东西（模型自己会换算成本地坐标）。
+   */
+  lookAt(x: number, y: number): void {
+    this.model.focus(x, y)
+  }
+
+  /** 指针离开窗口：把目光收回窗口正中，否则它会一直盯着最后停下的那个角落 */
+  lookAtAway(): void {
+    this.model.focus(this.host.clientWidth / 2, this.host.clientHeight / 2)
+  }
+
   /** 表情管理器；模型完全没有表情时返回 undefined */
   private expressionManager(): NonNullable<
     NonNullable<Live2DModelLike['internalModel']>['motionManager']
@@ -335,13 +377,15 @@ class Live2DRenderer implements PetRenderer {
     this.observer.disconnect()
     try {
       // 必须显式要求一并销毁贴图。库的 destroy() 默认只销毁模型骨架，贴图会继续留在
-      // Pixi 的全局 TextureCache 里 —— 于是「切换形象」变成只增不减：实测把 6 个形象
-      // 都看过一遍后，渲染进程多背了约 490 MB 的解码贴图，且永远不会释放。
+      // Pixi 的全局 TextureCache 里 —— 于是「切换形象」变成只增不减：把这批模型都浏览
+      // 一遍之后，渲染进程会一直背着几百 MB 的解码贴图，且永远不会释放。
       //
       // 加 texture + baseTexture 两个标志才能既释放解码内存，又把缓存键一起清掉
       // （Pixi 的 Texture.destroy(true) 内部会 removeFromCache）。漏掉任何一半都会出问题：
       // 只销毁不清键，下次切回这个形象会拿到一张已经销毁的贴图，直接渲染成空白。
       this.model.destroy({ texture: true, baseTexture: true })
+      // app 与模型共用 Ticker.shared（sharedTicker: true）。TickerPlugin 的 destroy 会摘掉
+      // 渲染回调，而 Ticker.shared 是 protected 的，destroy() 对它无效，不会被误杀。
       this.app.destroy(true)
     } catch (error) {
       console.warn('[pet] 销毁 Live2D 渲染器时出错：', error)

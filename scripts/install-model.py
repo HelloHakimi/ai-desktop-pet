@@ -13,7 +13,7 @@
 
 用法：
   python3 scripts/install-model.py <源模型目录> <目标目录名> --name "托盘显示名"
-  python3 scripts/install-model.py /tmp/extract/Yuuri yuuri --name "Yuuri"
+  python3 scripts/install-model.py /tmp/extract/MyModel my-model --name "我的形象"
 
 源模型目录必须正好含有一个 *.model3.json（在其顶层）。
 """
@@ -254,7 +254,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("source", type=Path, help="源模型目录")
-    parser.add_argument("slug", help="目标目录名，例如 yuuri")
+    parser.add_argument("slug", help="目标目录名，例如 qpet-a")
     parser.add_argument("--name", default="", help="托盘里显示的名字，默认用 slug")
     parser.add_argument("--texture-size", default="2048", help="贴图边长，默认 2048")
     parser.add_argument(

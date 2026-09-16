@@ -120,21 +120,44 @@ export function listModels(): PetModel[] {
 }
 
 /**
+ * 把 `model.path`（相对 models/）解析成绝对路径。
+ *
+ * `model.path` 是用户可改的，写 `../..` 就能读到应用目录以外的地方，所以这里统一做越界拦截，
+ * 越界与「文件不存在」都返回 null —— 调用方要的只是「这个路径能不能用」。
+ */
+function resolveModelFile(relativePath: string): string | null {
+  const root = normalize(modelsRoot())
+  const full = normalize(join(root, relativePath.replace(/\\/g, '/')))
+
+  if (full === root || !full.startsWith(root + sep)) {
+    console.warn(`[models] 拒绝越界的 model.path：${relativePath}`)
+    return null
+  }
+  return full
+}
+
+/** 配置里写的那个模型文件是否真的还在（用来兜住「模型被删了但配置还指着它」） */
+export function modelExists(relativePath: string): boolean {
+  const full = resolveModelFile(relativePath)
+  if (!full) return false
+  try {
+    return statSync(full).isFile()
+  } catch {
+    return false
+  }
+}
+
+/**
  * 读当前形象的 model3.json，取出登记的表情清单。
  *
  * 表情名是 model3.json 里 `FileReferences.Expressions[].Name`，渲染层按这个名字查找，
- * 所以这里必须原样透传，不能做任何「美化」（这批模型里既有含空格的「手势 抱娃娃」，
- * 也有和文件名对不上的「右键 → 左键.exp3.json」）。
+ * 所以这里必须原样透传，不能做任何「美化」：`Name` 和文件名本来就不保证一致
+ * （`右键` 指向 `左键.exp3.json`、`左键` 指向 `真 左键.exp3.json`、`大哭` 指向 `哭.exp3.json`），
+ * 名字里也可能含空格。任何「贴心地」用文件名替换名字的做法都会让表情彻底点不动。
  */
 export function listExpressions(modelPath: string): PetExpression[] {
-  const root = normalize(modelsRoot())
-  const full = normalize(join(root, modelPath.replace(/\\/g, '/')))
-
-  // model.path 是用户可改的，config 里写 ../.. 就能读到应用目录以外的地方
-  if (full !== root && !full.startsWith(root + sep)) {
-    console.warn(`[models] 拒绝越界的 model.path：${modelPath}`)
-    return []
-  }
+  const full = resolveModelFile(modelPath)
+  if (!full) return []
 
   try {
     const parsed: unknown = JSON.parse(readFileSync(full, 'utf-8'))

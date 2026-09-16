@@ -52,6 +52,14 @@ export class PlaceholderRenderer implements PetRenderer {
     // no-op：占位形象不支持表情
   }
 
+  lookAt(): void {
+    // no-op：占位形象没有可动的目光
+  }
+
+  lookAtAway(): void {
+    // no-op：占位形象没有可动的目光
+  }
+
   destroy(): void {
     this.element.remove()
   }

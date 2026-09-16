@@ -1,9 +1,10 @@
-/** 渲染层入口：装配形象渲染器、拖动与点击穿透 */
+/** 渲染层入口：装配形象渲染器、拖动、点击穿透与目光跟随 */
 import './style.css'
 import type { RendererConfig } from '@shared/config'
 import { bindHitTest } from './drag/hitTest'
 import { bindWindowDrag } from './drag/windowDrag'
 import { createRenderer } from './pet/createRenderer'
+import { bindLookAt } from './pet/lookAt'
 import { PlaceholderRenderer } from './pet/PlaceholderRenderer'
 import type { PetRenderer } from './pet/types'
 
@@ -67,12 +68,13 @@ async function boot(): Promise<void> {
     () => current?.getHitBox() ?? null,
     () => latestConfig?.window.clickThrough ?? false
   )
+  bindLookAt(
+    () => current,
+    () => latestConfig?.model.autoInteract ?? false
+  )
 
   window.pet.onConfigChanged((next) => {
     void mountPet(next)
-  })
-  window.pet.onModelReloaded(() => {
-    void window.pet.getConfig().then(mountPet)
   })
   window.pet.onExpression((command) => {
     // 切换形象是异步的，这期间 current 可能是 null —— 直接丢掉比排队更合适：

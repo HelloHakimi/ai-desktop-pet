@@ -1,7 +1,7 @@
 /** 应用入口：单实例、创建桌宠窗口、托盘、注册 IPC */
 import { BrowserWindow, app } from 'electron'
 import { join } from 'node:path'
-import { loadConfig } from './config'
+import { loadConfig, repairModelSelection } from './config'
 import { registerIpcHandlers } from './ipc'
 import { createPetWindow, getPetWindow } from './pet-window'
 import { registerAppScheme, serveRenderer } from './protocol'
@@ -23,6 +23,8 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(() => {
+    // 先修配置再读：配置可能指着一个已经被删掉的模型目录（见 repairModelSelection）
+    repairModelSelection()
     const config = loadConfig()
 
     // 把 out/renderer 挂到 app://bundle/，渲染层与 Live2D 模型资源都从这里加载

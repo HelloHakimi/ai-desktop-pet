@@ -13,11 +13,9 @@ const api: PetApi = {
   dragStart: () => ipcRenderer.send(IPC.dragStart),
   dragEnd: () => ipcRenderer.invoke(IPC.dragEnd) as Promise<DragResult>,
   setInteractive: (interactive: boolean) => ipcRenderer.send(IPC.setInteractive, interactive),
-  requestReloadModel: () => ipcRenderer.send(IPC.requestReloadModel),
   chat: (messages: ChatMessage[], options?: ChatOptions) =>
     ipcRenderer.invoke(IPC.chat, messages, options) as Promise<ChatResponse>,
   onConfigChanged: (listener) => subscribe(IPC.configChanged, listener),
-  onModelReloaded: (listener) => subscribe(IPC.modelReloaded, () => listener()),
   onExpression: (listener) => subscribe<ExpressionCommand>(IPC.expression, listener),
   quit: () => ipcRenderer.send(IPC.quit)
 }

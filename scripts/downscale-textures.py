@@ -13,7 +13,7 @@
 
 用法：
   python3 scripts/downscale-textures.py <模型目录> <边长>
-  python3 scripts/downscale-textures.py src/renderer/public/models/blue-cat 2048
+  python3 scripts/downscale-textures.py src/renderer/public/models/qpet-a 2048
 
 依赖 macOS 自带的 sips。跑之前建议先备份原始贴图（原图压不回细节）。
 """

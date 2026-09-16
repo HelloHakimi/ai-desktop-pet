@@ -16,14 +16,6 @@ export const IPC = {
   dragEnd: 'pet:drag-end',
   /** 告知主进程当前鼠标是否落在形象上，用于切换点击穿透 */
   setInteractive: 'pet:set-interactive',
-  /** 渲染层请求重新加载形象 */
-  requestReloadModel: 'pet:request-reload-model',
-  /**
-   * 主进程通知渲染层重新加载形象。
-   * 目前「重新加载形象」走的是 configChanged（配置变了顺带重建形象），
-   * 这条留给将来「只有模型资源变了」的场景（例如模型文件被替换时自动重载）。
-   */
-  modelReloaded: 'pet:model-reloaded',
   /** 一次性对话（流式留待后续里程碑） */
   chat: 'ai:chat',
   /** 主进程通知渲染层换表情（托盘「试个表情」触发） */
@@ -36,12 +28,11 @@ export const IPC = {
  * 表情指令。
  *
  * 用可辨识联合，而不是「传空字符串表示还原」这类约定 ——
- * 表情名字本身就可能含空格和奇怪字符（这批模型里就有「手势 抱娃娃」「真 左键」），
- * 靠哨兵值迟早会撞上。
+ * 表情名字本身就可能含空格和奇怪字符（当前形象里就有「真 左键」），靠哨兵值迟早会撞上。
  */
 export type ExpressionCommand =
   | { kind: 'named'; name: string }
-  /** 随机抽一个（这批模型自带 11~44 个表情，随机很有用） */
+  /** 随机抽一个（当前形象自带 40 个表情，随机很有用） */
   | { kind: 'random' }
   /** 回到没有任何表情的默认状态 */
   | { kind: 'reset' }
@@ -57,10 +48,8 @@ export interface PetApi {
   dragStart(): void
   dragEnd(): Promise<DragResult>
   setInteractive(interactive: boolean): void
-  requestReloadModel(): void
   chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResponse>
   onConfigChanged(listener: (config: RendererConfig) => void): () => void
-  onModelReloaded(listener: () => void): () => void
   onExpression(listener: (command: ExpressionCommand) => void): () => void
   quit(): void
 }

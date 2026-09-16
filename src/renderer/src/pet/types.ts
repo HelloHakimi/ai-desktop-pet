@@ -21,6 +21,10 @@ export interface PetRenderer {
   setExpression(name?: string): void
   /** 回到没有任何表情的默认状态（占位形象为空实现） */
   resetExpression(): void
+  /** 目光跟随指针，坐标是窗口内的 CSS 像素（占位形象为空实现） */
+  lookAt(x: number, y: number): void
+  /** 指针离开窗口，目光收回正中（占位形象为空实现） */
+  lookAtAway(): void
   destroy(): void
 }
 

@@ -1,23 +1,20 @@
 # Live2D 模型放这里
 
-每个模型一个子目录。仓库里现在有 6 个（`blue-cat` / `yuuri` / `cotton` / `honey-peach` /
-`qpet-a` / `qpet-b`），共约 95 MB。
+每个模型一个子目录。仓库里现在只有 1 个：`qpet-a`（Q版 A），约 4.2 MB。
 
 ```
 models/
-└── yuuri/
-    ├── pet-model.json          ← 清单：菜单显示名 + 待机动作组名
-    ├── yuuri.model3.json       ← 入口文件
-    ├── yuuri.moc3
-    ├── Yuuri.physics3.json
-    ├── Yuuri.cdi3.json
-    ├── Yuuri.2048/             ← 贴图（目录名里的数字是边长）
-    │   └── texture_00.png …
-    ├── motions/
-    │   ├── idle.motion3.json
-    │   └── wave.motion3.json
-    └── expressions/
-        └── Heart.exp3.json
+└── qpet-a/
+    ├── pet-model.json              ← 清单：菜单显示名 + 待机动作组名
+    ├── A_Qpet_90.model3.json       ← 入口文件
+    ├── A_Qpet_90.moc3
+    ├── A_Qpet_90.physics3.json
+    ├── A_Qpet_90.cdi3.json
+    ├── A_Qpet_90.2048/             ← 贴图（目录名里的数字是边长）
+    │   └── texture_00.png
+    ├── idle.motion3.json           ← 动作直接放在顶层
+    ├── feifeiji.motion3.json
+    └── 爱心眼.exp3.json             ← 表情同理
 ```
 
 ## 目录约定
@@ -50,7 +47,7 @@ python3 scripts/install-model.py <源模型目录> <目标目录名> --name "菜
 
 ```json
 {
-  "name": "水色小猫咪",
+  "name": "Q版 A",
   "idleMotionGroup": "Idle"
 }
 ```
@@ -92,9 +89,12 @@ python3 scripts/install-model.py <源模型目录> <目标目录名> --name "菜
 
 ```
 [tray] 模型目录：/Users/zwj/桌宠/src/renderer/public/models
-[tray] 可用形象 6 个：水色小猫咪、晚安少女、桃瑟古风、Q版 A、Q版 B、Yuuri
+[tray] 可用形象 1 个：Q版 A
 [tray] 当前形象：qpet-a/A_Qpet_90.model3.json（表情 40 个）
 ```
+
+（如果配置里指着的模型被删掉了，启动日志里还会多一行「配置里的形象不存在（…），改用「Q版 A」」——
+应用会自己把 `model.path` 改指到一个确实存在的形象，不会让你面对一组全都没打勾的单选项。）
 
 注意 **dev 与打包后扫的不是同一个目录**：dev 下是源码里的 `src/renderer/public/models`
 （渲染层由 Vite dev server 提供），打包后是 `.app` 内的 `out/renderer/models`。

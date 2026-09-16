@@ -3,7 +3,6 @@ import { app, ipcMain } from 'electron'
 import { sanitizeMessages, withSystemPrompt, type ChatOptions } from '@shared/ai'
 import { toRendererConfig } from '@shared/config'
 import { IPC, type DragResult } from '@shared/ipc'
-import { reloadPet } from './actions'
 import { createProvider } from './ai'
 import { loadConfig } from './config'
 import { endDrag, setInteractive, startDrag } from './pet-window'
@@ -17,8 +16,6 @@ export function registerIpcHandlers(): void {
   ipcMain.on(IPC.setInteractive, (_event, value: unknown) => {
     if (typeof value === 'boolean') setInteractive(value)
   })
-
-  ipcMain.on(IPC.requestReloadModel, () => reloadPet())
 
   ipcMain.on(IPC.quit, () => app.quit())
 

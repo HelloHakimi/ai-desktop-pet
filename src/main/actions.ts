@@ -7,9 +7,9 @@ import { getPetWindow } from './pet-window'
 /**
  * 重新从磁盘读取配置，并把新配置推给渲染层后重建形象。
  *
- * 只发 configChanged 一条：渲染层拿到新配置就会重建形象，再补一条 modelReloaded
- * 会让它重建两次，两次异步挂载互相覆盖，前一个渲染器的 canvas 与 Pixi ticker 会泄漏。
- * （configChanged 本身就代表「配置变了，重来一遍」，modelReloaded 留给将来「只有模型文件变了」的场景。）
+ * 只发 `configChanged` 一条：渲染层拿到新配置就会重建形象。这里刻意**不**再补一条
+ * 「模型变了」的通知 —— 那会让渲染层把形象重建两次，两次异步挂载互相覆盖，
+ * 先完成的那个渲染器的 canvas 与 Pixi ticker 会泄漏（这个坑踩过一次，见 README 修复记录）。
  *
  * 注意：窗口尺寸的改动不会即时生效，需要重启应用（改尺寸涉及透明窗重建，后续再处理）。
  */

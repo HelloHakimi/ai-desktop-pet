@@ -3,6 +3,7 @@
     "这是配置示例。实际生效的配置在 userData 目录下（托盘菜单「打开配置文件…」可直接打开），",
     "也可以用环境变量 PET_CONFIG 指向本文件：PET_CONFIG=./pet.config.example.json npm run dev",
     "换形象不必手改这里：托盘菜单「切换形象」选一下就写回了 model.path 与 idleMotionGroup。",
+    "model.path 指向的模型被删掉时，启动时会自动改指到仍然存在的一个形象，并把结果写回这里。",
     "API Key 建议用环境变量 PET_API_KEY 注入，不要写进任何会被提交的文件。"
   ],
   "window": {
@@ -15,7 +16,7 @@
   },
   "model": {
     "mode": "auto",
-    "path": "blue-cat/Blue cat.model3.json",
+    "path": "qpet-a/A_Qpet_90.model3.json",
     "idleMotionGroup": "Idle",
     "autoInteract": true
   },

@@ -17,8 +17,9 @@ let tray: Tray | null = null
  * 上一次通过菜单套用的表情名，只用来画勾。
  *
  * 主进程本来不该记这种状态，但这个菜单有几十项，没有勾用户根本记不住刚点了哪个。
- * 它与实际状态可能失配的场合只有一个：「重新加载形象」会重建渲染器、表情随之清空，
- * 而这里不知道 —— 那种时候勾会短暂停留在旧值上，属于可接受的代价。
+ * 凡是会让渲染层丢掉表情的操作（切换形象、重新加载形象、随机、还原）都会把它清掉，
+ * 所以勾不会长期骗人；唯一的失配窗口是渲染层套用失败时这里已经先打了勾 ——
+ * 「随机」本来就是不可预测的，也没法预判，属于可接受的代价。
  */
 let lastExpression: string | null = null
 
@@ -69,7 +70,16 @@ function rebuildMenu(): void {
     { type: 'separator' },
     { label: '切换形象', submenu: modelEntries() },
     { label: '试个表情', submenu: expressionEntries() },
-    { label: '重新加载形象', click: () => reloadPet() },
+    {
+      label: '重新加载形象',
+      click: () => {
+        reloadPet()
+        // 重建渲染器会把表情清回默认，勾必须跟着清 —— 留着就是一个明确的谎。
+        lastExpression = null
+        // 顺便重扫目录：用户可能刚在模型文件夹里改了 pet-model.json 里的显示名
+        rebuildMenu()
+      }
+    },
     {
       label: '打开配置文件…',
       click: () => {
