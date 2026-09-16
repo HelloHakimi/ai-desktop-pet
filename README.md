@@ -154,9 +154,30 @@ npm run setup:live2d
 改动是**纯增量**的（只加不改原有字段），想回到原版把这 `Motions` / `Expressions` / `Groups`
 三段删掉即可。
 
-**资源开销提醒**：这套贴图是 5 张 4096×4096，实测 Electron 各进程常驻内存合计约 945 MB
-（其中 GPU 进程 600 MB）。桌宠却只显示在 245×460 的区域里，4096 的分辨率是巨大浪费 ——
-把贴图降到 1024 在视觉上几乎看不出差别，内存能降一个数量级。需要的话可以做（脚本不在仓库里）。
+### 贴图降采样：常驻内存 924 MB → 582 MB
+
+模型自带的贴图是 5 张 **4096×4096**（解码驻留约 320 MB），但形象只渲染在 245×460 的区域里，
+实际只需要约 2.25 texel/像素 —— 4096 有一半以上的分辨率是白解码、白占显存的。
+
+```
+python3 scripts/downscale-textures.py src/renderer/public/models/blue-cat 2048
+```
+
+实测（同机同配置，只改贴图分辨率）：
+
+| | 4096（原始） | 2048（当前） |
+| --- | --- | --- |
+| 合计常驻内存 | 924 MB | **582 MB** |
+| 渲染进程 | 593 MB | 305 MB |
+| GPU 进程 | 145 MB | 90 MB |
+| 贴图文件体积 | 21.7 MB | 7.2 MB |
+
+画质验证方式是**先把待机动作和眨眼冻住**再逐像素比 —— 第一版对比得出「15% 像素不同」是假象，
+那比的是动画的不同帧，不是画质。冻住之后：平均通道差 1.14/255，差异集中在轮廓的亚像素抗锯齿，
+3 倍放大目视无可见差别。
+
+想恢复原始贴图：`~/Trash/水色小猫咪.zip` 里还有原图（解压后跑一次
+`downscale-textures.py` 的反向操作，或直接把 `.4096` 目录和 `model3.json` 的引用改回去）。
 
 ## 接入大模型
 
@@ -217,6 +238,8 @@ PixiJS 6 内部用 `new Function()` 生成 uniform 同步代码，会被 `script
 | 动作与表情 | 隔 0.9 秒截两张图对比确认画面在动（待机动作 + 眨眼）；`setExpression('哭哭' / '心心眼' / '生气')` 逐个触发，画面均发生对应变化 |
 | 打包产物 | `npm run dist` 产出 `AI 桌宠.app`；从 .app 内启动实测渲染正常、零报错；包体 277 MB（其中 Electron 框架 230 MB，自身内容 44 MB，node_modules 未进包） |
 | 打包后的配置 | 实测打包版仍读 `~/Library/Application Support/ai-desktop-pet/pet.config.json`（文件未被重建，mtime 不变），没有因为改了 productName 而换目录 |
+| 贴图降采样 | 冻住动画后逐像素对比：平均通道差 1.14/255，3 倍放大无可见差别；常驻内存实测 924 → 582 MB |
+| 依赖与打包边界 | 实测 `.app` 内没有 `node_modules`；`npm audit --omit=dev` 为 0 vulnerabilities |
 | 形象几何与可交互性 | CDP 实测：2400×4500 的模型在 320×460 窗口里缩放为 245×460 且完整落在窗口内；命中框 172×322 也在窗口内（中心可点、四角穿透）；`refit()` 连调 4 次缩放值不变 |
 | 重建形象不泄漏 | 连点 3 次「重新加载形象」：`mountCount` 每次 +1、DOM 内 canvas 恒为 1、缩放保持正确（修复前是每次 +2 挂载、2 个 canvas，泄漏 WebGL 上下文） |
 | 对话链路 | 假 OpenAI 端点实测：主进程发出的请求体里 `systemPrompt` 已注入、渲染层伪造的 system 消息被剔除、`temperature: 99` 被夹取为 2、超时返回 `请求超时（1200 ms）` |
@@ -328,6 +351,7 @@ chunk**（产物里能看到 `pixi-*.js`、`cubism4.es-*.js`），运行时不�
 | `npm run typecheck` | 类型检查（主进程 / 渲染层两套 tsconfig） |
 | `npm run setup:live2d` | 下载 Cubism Core |
 | `npm run make:icon` | 重新生成应用图标（`build/icon.icns`） |
+| `python3 scripts/downscale-textures.py <模型目录> <边长>` | 贴图降采样（省内存，需 macOS 自带 sips） |
 | `npm run ai:ping` | 模型连通性自检 |
 | `python3 scripts/make-tray-icon.py` | 重新生成托盘图标 |
 
