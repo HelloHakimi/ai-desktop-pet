@@ -19,13 +19,19 @@ const CUBISM_CORE_URL = './vendor/live2dcubismcore.min.js'
 const HIT_INSET = 0.15
 
 /**
- * 目标帧率。
+ * 帧率上限。**0 = 不限帧，跟着显示器刷新率走**（这台 60 Hz 面板上就是 60 fps）。
  *
- * 桌宠是常驻程序，而 Pixi 默认跑满 60 fps —— 实测渲染进程因此稳定占着 27% 的 CPU，
- * 一整天下来是纯浪费。Live2D 是角色动画，30 fps 和 60 fps 在这块 320×460 的窗口里
- * 肉眼分不出来，CPU 却能直接砍掉一半。
+ * 这里刻意不写 60：Pixi 的 maxFPS 是一道「这一帧不够时间就跳过」的闸门，只有它恰好等于
+ * 刷新率时才既不掉帧也不空转。实测在 60 Hz 面板上 maxFPS = 60 只能跑出 58.3 fps
+ * （约 3% 的帧被丢掉，表现就是时不时一顿），maxFPS = 59 更糟（56.3 fps）；
+ * 只有不限帧是干净的 60.0 fps。
+ *
+ * 曾经把它钉在 30 想省 CPU，那是个错误的取舍 —— 桌宠可以省电，但不能卡。
+ * 60 fps 在这台机器上稳定占一个核的 24%（30 fps 是 17%，1 fps 也还有 3.7% 的合成本底）。
+ * 那 3.5 ms/帧的开销全在 Cubism 的骨骼/物理/网格更新里，跟分辨率、抗锯齿、画布面积
+ * 都无关（三者都实测过，占用没有可测差别），所以除了降帧率没有别的杠杆可用。
  */
-const TARGET_FPS = 30
+const TARGET_FPS = 0
 
 type PixiApplication = InstanceType<typeof PixiNS.Application>
 
