@@ -3,12 +3,23 @@
     "这是配置示例。实际生效的配置在 userData 目录下（托盘菜单「打开配置文件…」可直接打开），",
     "也可以用环境变量 PET_CONFIG 指向本文件：PET_CONFIG=./pet.config.example.json npm run dev",
     "换形象不必手改这里：托盘菜单「切换形象」选一下就写回了 model.path 与 idleMotionGroup。",
+    "window.x/y 是拖动形象之后自动写回的窗口落点（null = 交给系统摆），托盘的「始终置顶 / 点击穿透」同样会写回这里。",
+    "model.hiddenParts 填部件 id（如 \"Part12\"）可以遮掉形象上的配件，比如翅膀；只影响显示，清空即可恢复。",
     "model.path 指向的模型被删掉时，启动时会自动改指到仍然存在的一个形象，并把结果写回这里。",
+    "assist.shortcut 是「把刚复制的那段文字交给桌宠处理」的全局快捷键（Electron 写法，如 Alt+Command+Up）；",
+    "  改成空字符串就等于关掉这个功能，改了要重启才生效（快捷键只在启动时注册一次）。",
+    "assist.clipboardHistory 是「剪贴板历史」保留几条 —— 那几段文字只存在内存里，不落盘，重启即忘。",
+    "assist.companion 是「主动说话」（久坐提醒、深夜问候），也可以直接在托盘菜单里勾。",
+    "assist.systemEvents 是「系统事件」（拔插电源、断网时说一句），同样可以在托盘菜单里勾。",
+    "assist.smalltalk 是「闲聊」：碎碎念与梦话、打招呼（回来 / 每天第一次见）、饭点、节日与纪念日、",
+    "  以及它偶尔主动拉你玩一局的邀请。陪玩本身（你说「猜数字」「哭一个」才开局的那些）不看这个开关。",
     "API Key 建议用环境变量 PET_API_KEY 注入，不要写进任何会被提交的文件。"
   ],
   "window": {
     "width": 320,
     "height": 460,
+    "x": null,
+    "y": null,
     "alwaysOnTop": true,
     "clickThrough": true,
     "hideDockIcon": true,
@@ -18,7 +29,8 @@
     "mode": "auto",
     "path": "qpet-a/A_Qpet_90.model3.json",
     "idleMotionGroup": "Idle",
-    "autoInteract": true
+    "autoInteract": true,
+    "hiddenParts": []
   },
   "ai": {
     "provider": "openai-compatible",
@@ -28,6 +40,15 @@
     "systemPrompt": "你是一只住在用户桌面上的小宠物，说话简短、俏皮、有温度，每次回复不超过两句话。",
     "temperature": 0.8,
     "maxTokens": 512,
-    "timeoutMs": 30000
+    "timeoutMs": 30000,
+    "contextLimit": 20
+  },
+  "assist": {
+    "shortcut": "Alt+Command+Up",
+    "clipboardHistory": 8,
+    "focusPresets": [25, 45, 60],
+    "companion": true,
+    "systemEvents": true,
+    "smalltalk": true
   }
 }

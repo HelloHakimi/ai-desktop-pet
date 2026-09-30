@@ -128,3 +128,91 @@ body.is-dragging {
     transform: scaleY(0.1);
   }
 }
+
+/* ---------- 形象气泡：桌宠「说」的那一句 ---------- */
+
+.pet-bubble {
+  position: absolute;
+  left: 50%;
+  /* bottom 由 JS 按形象命中框算，这里只管水平居中与出入场 */
+  transform: translateX(-50%) translateY(4px);
+  z-index: 1;
+  max-width: calc(100% - 20px);
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(16, 24, 40, 0.82);
+  color: #e8f1ff;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(8, 18, 40, 0.32);
+  /* 纯展示：气泡就浮在形象头顶，能收鼠标事件就会把「鼠标在气泡上」判成「在形象上」，
+     命中判定与拖动都会跟着出问题 */
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.pet-bubble--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 指向形象的小尖角。整块落在气泡下边缘之外（bottom: -5px 且高度也是 5px），
+   与气泡本体不重叠 —— 半透明背景叠在一起会在重叠处更深一块。 */
+.pet-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 10px;
+  height: 5px;
+  margin-left: -5px;
+  background: rgba(16, 24, 40, 0.82);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* 出错时用红调：和对话窗口里的错误提示同一个色，两处看到的是同一件事 */
+.pet-bubble--error {
+  border-color: rgba(255, 123, 123, 0.45);
+  color: #ffc9c9;
+}
+
+/* ---------- 气泡里的提问按钮 ---------- */
+
+/* 气泡本体是 pointer-events: none（见上），这一排把指针事件单独要回来 ——
+   它是气泡里唯一能被点的东西。20 秒的倒计时与悬停暂停在 pet/bubble.ts 里。 */
+.pet-bubble__options {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+  pointer-events: auto;
+}
+
+.pet-bubble__option {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8f1ff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pet-bubble__option:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.pet-bubble__option:active {
+  background: rgba(255, 255, 255, 0.28);
+}

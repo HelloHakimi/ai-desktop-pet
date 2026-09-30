@@ -11,12 +11,24 @@
  */
 import type * as PixiNS from 'pixi.js'
 import type { RendererConfig } from '@shared/config'
+import { BlinkScheduler } from './blink'
+import { ExpressionDefs, parseExpressionEntries, type ExpressionEntry } from './expressionDefs'
+import { ExpressionDirector, type ExpressionCore } from './expressionDirector'
 import type { HitBox, PetRenderer } from './types'
 
 /** Cubism Core 由官方单独分发，放在 public/vendor/ 下按需注入 */
 const CUBISM_CORE_URL = './vendor/live2dcubismcore.min.js'
-/** 命中框收窄比例：模型包围盒包含大量透明区域，直接用会挡住桌面 */
+/** 命中框收窄比例：模型包围盒包含大量透明区域，直接用会挡住桌面（掩码不可用时的兜底） */
 const HIT_INSET = 0.15
+
+/** 命中掩码的横向格数：模型宽度被切成这么多格，纵向格数按比例算 */
+const MASK_COLS = 64
+/** 掩码里 alpha 到多少算「这里真的画到了东西」（0–255；留点余量给抗锯齿边缘） */
+const MASK_ALPHA_MIN = 24
+/** 采样邻域半径（格）：琴槌、贴纸这类薄东西不该因为正好落在格子边上就点不中 */
+const MASK_SAMPLE_RADIUS = 1
+/** 掩码重建间隔：形象一直在动（呼吸、待机、道具），但轮廓变化慢，秒级足够 */
+const MASK_REFRESH_MS = 2000
 
 /**
  * 帧率上限。**0 = 不限帧，跟着显示器刷新率走**（这台 60 Hz 面板上就是 60 fps）。
@@ -34,6 +46,8 @@ const HIT_INSET = 0.15
 const TARGET_FPS = 0
 
 type PixiApplication = InstanceType<typeof PixiNS.Application>
+/** 动态 import 进来的 pixi 模块本身（掩码要用它的 RenderTexture / Matrix 这些**值**） */
+type PixiModule = typeof import('pixi.js')
 
 /** 我们实际用到的 Live2DModel 能力面 */
 interface Live2DModelLike {
@@ -41,11 +55,16 @@ interface Live2DModelLike {
   y: number
   width: number
   height: number
-  scale: { set(value: number): void }
+  rotation: number
+  /** 斜切与 pivot（`anchor` 就是通过 pivot 实现的，见库的 onAnchorChange） */
+  skew: { x: number; y: number }
+  pivot: { x: number; y: number }
+  scale: { x: number; y: number; set(x: number, y?: number): void }
   anchor: { set(x: number, y: number): void }
   getBounds(): { x: number; y: number; width: number; height: number }
+  /** 模型自身坐标系里的包围盒（不含它自己的位移与缩放）：生成命中掩码时按它开离屏画面 */
+  getLocalBounds(): { x: number; y: number; width: number; height: number }
   motion(group: string, index?: number): Promise<unknown>
-  expression(name?: string): Promise<unknown>
   /**
    * 让目光/头部看向舞台坐标 (x, y)（内部会换算成模型的本地坐标并做缓动）。
    *
@@ -55,24 +74,34 @@ interface Live2DModelLike {
    */
   focus(x: number, y: number, instant?: boolean): void
   /**
-   * 只为「还原默认表情」和「查名字是否存在」而开的一条路。
-   *
-   * 库的 Live2DModel 上只暴露了 expression(name)，既没有还原方法、也没法判断一个名字
-   * 到底在不在。这两件事在 ExpressionManager 上，而 internalModel → motionManager →
-   * expressionManager 这三层在库的类型声明里都是 public 的，不算掏私有字段。
-   * expressionManager 是可选的：模型完全没有表情时它不存在。
+   * 库的表情槽**不用**：它是单槽语义（一个 currentExpression，新的顶掉旧的），
+   * 而我们要的是可叠加的分层（墨镜 + 奶茶 + 生气脸同时成立）。
+   * 表情改由 pet/expressionDefs.ts 读 exp3 参数、pet/expressionDirector.ts 每帧写。
    */
   internalModel?: {
-    motionManager?: {
-      expressionManager?: {
-        resetExpression(): void
-        /** 名字查不到时返回 -1 */
-        getExpressionIndex(name: string): number
-        /** 下面两个是公开字段，用 unknown 收着 —— 这个文件刻意不引入库的类型声明 */
-        defaultExpression?: unknown
-        currentExpression?: unknown
-      }
+    /**
+     * 库自带眨眼（CubismEyeBlink）。我们接管后把它置成 undefined —— 它的时序是 0–7 秒的
+     * 均匀分布、调不到 4–8 秒，而且只在「本帧没有动作在播」时推进，在循环待机动作下
+     * 时钟被饿死（详见 pet/blink.ts 与 README 修复记录）。
+     */
+    eyeBlink?: unknown
+    /** 参数读写通道：眨眼与表情层都在 beforeModelUpdate 时刻经这里写模型 */
+    coreModel?: {
+      getParameterValueById(id: string): number
+      setParameterValueById(id: string, value: number): void
+      /** 名字查不到时返回 -1（表情层用它筛掉当前模型没有的参数） */
+      getParameterIndex(id: string): number
+      /** 部件通道：配置 model.hiddenParts 用它把指定部件压透明（名字查不到时返回 NaN） */
+      getPartIndex(id: string): number
+      setPartOpacityByIndex(index: number, opacity: number): void
     }
+    /** 模型登记的眨眼参数（model3.json 的 Groups.EyeBlink）；没登记就眨不了 */
+    settings?: {
+      getEyeBlinkParameters(): string[] | undefined
+    }
+    /** pixi 的 EventEmitter：把眨眼挂到库的参数写入窗口（beforeModelUpdate）上 */
+    on(event: string, listener: () => void): void
+    off(event: string, listener: () => void): void
   }
   destroy(options?: { texture?: boolean; baseTexture?: boolean }): void
 }
@@ -87,6 +116,23 @@ declare global {
 export type Live2DAttempt =
   | { ok: true; renderer: PetRenderer }
   | { ok: false; reason: string; detail?: string }
+
+/**
+ * 命中掩码：模型包围盒内的一张小 alpha 网格。
+ *
+ * 它是「生成那一刻画面的轮廓」，所以只对生成它的那块区域有效 —— 生成时把当时的包围盒
+ * 一起记下来，判定时把点按比例映射回格子。模型缩放/重排（refit）之后会重建。
+ */
+interface AlphaMask {
+  alpha: Uint8Array
+  cols: number
+  rows: number
+  /** 掩码覆盖的区域（窗口 CSS 像素） */
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
 let coreLoader: Promise<boolean> | null = null
 let coreAttempts = 0
@@ -127,13 +173,18 @@ function injectScript(src: string): Promise<void> {
   })
 }
 
-interface ModelProbe {
-  ok: boolean
-  url: string
-  reason?: string
-}
+type ModelProbe =
+  | {
+      ok: true
+      url: string
+      /** 表情文件（exp3）相对 model3.json 的同级目录，拼接用 */
+      baseUrl: string
+      /** model3.json 里登记的表情清单；取不到就是空数组（这个形象没有表情） */
+      expressions: ExpressionEntry[]
+    }
+  | { ok: false; url: string; reason: string }
 
-/** 探测模型文件是否真的存在且像一份 model3.json */
+/** 探测模型文件是否真的存在且像一份 model3.json，顺带把表情清单带回来 */
 async function probeModel(relativePath: string): Promise<ModelProbe> {
   const url = `./models/${relativePath.replace(/^\/+/, '')}`
   try {
@@ -141,11 +192,19 @@ async function probeModel(relativePath: string): Promise<ModelProbe> {
     if (!response.ok) {
       return { ok: false, url, reason: `模型文件不存在（HTTP ${response.status}）：${url}` }
     }
-    const json = (await response.json()) as { FileReferences?: { Moc?: unknown } }
+    const json = (await response.json()) as {
+      FileReferences?: { Moc?: unknown; Expressions?: unknown }
+    }
     if (typeof json.FileReferences?.Moc !== 'string') {
       return { ok: false, url, reason: `不是有效的 model3.json（缺少 FileReferences.Moc）：${url}` }
     }
-    return { ok: true, url }
+    return {
+      ok: true,
+      url,
+      // 表情文件与 model3.json 同级：baseUrl 就是它去掉文件名的目录部分
+      baseUrl: url.slice(0, url.lastIndexOf('/') + 1),
+      expressions: parseExpressionEntries(json.FileReferences.Expressions)
+    }
   } catch (error) {
     return { ok: false, url, reason: `读取模型失败：${describe(error)}` }
   }
@@ -160,7 +219,7 @@ export async function tryCreateLive2DRenderer(
   }
 
   const probe = await probeModel(config.model.path)
-  if (!probe.ok) return { ok: false, reason: probe.reason ?? '模型不可用' }
+  if (!probe.ok) return { ok: false, reason: probe.reason }
 
   let app: PixiApplication | null = null
   let canvas: HTMLCanvasElement | null = null
@@ -209,7 +268,7 @@ export async function tryCreateLive2DRenderer(
 
     app.stage.addChild(model as unknown as PixiNS.DisplayObject)
 
-    const renderer = new Live2DRenderer(app, model, host, config)
+    const renderer = new Live2DRenderer(app, model, host, config, probe, PIXI)
     renderer.refit()
 
     if (config.model.idleMotionGroup.length > 0) {
@@ -237,16 +296,168 @@ class Live2DRenderer implements PetRenderer {
   /** 模型未缩放时的尺寸，见 measureNaturalSize() 的说明 */
   private naturalWidth = 0
   private naturalHeight = 0
+  /** 接管后的眨眼；null = 这个形象没登记眨眼参数，眨不了 */
+  private blink: { scheduler: BlinkScheduler; parameterIds: string[] } | null = null
+  /** 配置点名要遮掉的部件（已解析成索引）；null = 这个形象没有要遮的部件 */
+  private hiddenParts: number[] | null = null
+  /** 命中掩码：按真实画出来的像素判「这个点算不算在形象上」；null = 拿不到，退回包围盒 */
+  private mask: AlphaMask | null = null
+  private maskTimer: number | null = null
+  /** 生成失败只抱怨一次：失败是持续性的（驱动/上下文），每两秒刷一行日志没有意义 */
+  private maskWarned = false
+  /** 表情分层：谁现在挂着、每帧往模型里写什么 */
+  private readonly defs: ExpressionDefs
+  private readonly expressions: ExpressionDirector
 
   constructor(
     private readonly app: PixiApplication,
     private readonly model: Live2DModelLike,
     private readonly host: HTMLElement,
-    private readonly config: RendererConfig
+    private readonly config: RendererConfig,
+    probe: Extract<ModelProbe, { ok: true }>,
+    private readonly pixi: PixiModule
   ) {
     this.measureNaturalSize()
     this.observer = new ResizeObserver(() => this.refit())
     this.observer.observe(host)
+
+    this.defs = new ExpressionDefs(probe.expressions, probe.baseUrl, this.requireCore())
+    this.expressions = new ExpressionDirector(this.defs)
+    // 注册顺序即执行顺序，不能调换：表情层写参数（Add 到动作写好的基准值上）必须早于眨眼，
+    // 否则眨眼那次乘法修饰会作用在「还没加上表情增量」的眼睛开合度上（墨镜那种把眼睛压到
+    // 闭合的表情就会在眨眼时被反着拉开）。
+    this.setupExpressions()
+    this.setupEyeBlink()
+    this.setupHiddenParts()
+
+    // 命中掩码：先建一次，之后按秒级节奏跟着形象更新（为什么这样刷见 refreshMask）
+    this.refreshMask()
+    this.maskTimer = window.setInterval(() => this.refreshMask(), MASK_REFRESH_MS)
+  }
+
+  /** 参数通道；模型没有 coreModel 时整个渲染器也不成立，所以这里是硬失败 */
+  private requireCore(): ExpressionCore {
+    const core = this.model.internalModel?.coreModel
+    if (!core) throw new Error('模型没有暴露 coreModel，无法读写参数')
+    return core
+  }
+
+  /**
+   * 表情层：每帧在 beforeModelUpdate 时刻写参数 ——
+   * 那是库里所有参数写入者（动作/呼吸/物理/目光）之后、model.update() 求值之前的唯一窗口，
+   * 写在这里才有「这一帧我说了算」的效果（写一次留不住，动作下一轮就覆盖回去了）。
+   */
+  private setupExpressions(): void {
+    this.model.internalModel?.on('beforeModelUpdate', this.onExpressionFrame)
+  }
+
+  private readonly onExpressionFrame = (): void => {
+    const core = this.model.internalModel?.coreModel
+    if (!core) return
+    this.expressions.applyFrame(core)
+  }
+
+  applyExpression(name: string, holdMs?: number): void {
+    this.expressions.play(name, holdMs)
+  }
+
+  toggleExpression(name: string): void {
+    this.expressions.toggle(name)
+  }
+
+  removeExpression(name: string): void {
+    this.expressions.remove(name)
+  }
+
+  clearExpressions(): void {
+    this.expressions.clearAll()
+  }
+
+  randomExpression(): void {
+    this.expressions.random()
+  }
+
+  activeExpressions(): string[] {
+    return this.expressions.activeNames()
+  }
+
+  hasExpression(name: string): boolean {
+    return this.defs.has(name)
+  }
+
+  /**
+   * 遮掉配置里点名的部件（model.hiddenParts）—— 用来去掉形象上不想要的配件，比如翅膀。
+   *
+   * 为什么每帧写一次而不是设一次就完事：部件透明度是动作与表情的写入对象，设一次会被它们
+   * 在下一次求值时盖掉。写在 beforeModelUpdate 上和眨眼同一个窗口 —— 那是所有参数/部件
+   * 写入者之后、model.update() 求值之前的最后时机。
+   *
+   * 名字对不上时只警告不抛错：配置是跨形象复用的，换了个形象就会对不上，那不是错误。
+   */
+  private setupHiddenParts(): void {
+    const core = this.model.internalModel?.coreModel
+    const wanted = this.config.model.hiddenParts
+    if (!core || wanted.length === 0) return
+
+    const indexes: number[] = []
+    const resolved: string[] = []
+    for (const id of wanted) {
+      // 名字查不到时 getPartIndex 返回的是 **NaN**，不是 -1（库的类型声明里没有这个方法，
+      // 行为是从运行中的模型上实测出来的）。写成 `index < 0` 会让 NaN 溜过去 ——
+      // 于是打错的部件 id 会被当成有效值传进 setPartOpacityByIndex，报错却是无声的。
+      const index = core.getPartIndex(id)
+      if (!Number.isInteger(index) || index < 0) {
+        console.warn(`[pet] 配置要遮掉的部件不存在：${id} —— 换形象之后这里会对不上，可清空 model.hiddenParts`)
+        continue
+      }
+      indexes.push(index)
+      resolved.push(id)
+    }
+    if (indexes.length === 0) return
+
+    this.hiddenParts = indexes
+    console.info(`[pet] 已遮掉 ${indexes.length} 个部件：${resolved.join('、')}`)
+    this.model.internalModel?.on('beforeModelUpdate', this.onHidePartsFrame)
+  }
+
+  private readonly onHidePartsFrame = (): void => {
+    const core = this.model.internalModel?.coreModel
+    const parts = this.hiddenParts
+    if (!core || !parts) return
+    for (const index of parts) core.setPartOpacityByIndex(index, 0)
+  }
+
+  /**
+   * 接管眨眼：每 4–8 秒随机眨一次（调度逻辑与「为什么不用库自带」见 pet/blink.ts）。
+   *
+   * 参数写在 beforeModelUpdate 时刻：那是库里所有参数写入者（动作/表情/呼吸/物理/目光）
+   * 之后、model.update() 求值之前的唯一窗口。写在这里的值和库自己写眨眼一样，帧尾会被
+   * loadParameters() 回滚，是「只作用于本帧」的修饰，我们不需要事后清理。
+   */
+  private setupEyeBlink(): void {
+    const internal = this.model.internalModel
+    const ids = internal?.settings?.getEyeBlinkParameters() ?? []
+    if (!internal || ids.length === 0) return
+
+    internal.eyeBlink = undefined
+    this.blink = { scheduler: new BlinkScheduler(), parameterIds: ids }
+    internal.on('beforeModelUpdate', this.onBlinkFrame)
+  }
+
+  private readonly onBlinkFrame = (): void => {
+    const blink = this.blink
+    const core = this.model.internalModel?.coreModel
+    if (!blink || !core) return
+
+    const open = blink.scheduler.advance(performance.now())
+    if (open === null) return
+
+    // 乘法修饰而不是绝对值覆盖：基准值可能已经是 0（`墨镜` 表情会把眼睛按到闭合），
+    // 直接写绝对值等于把闭着的眼睛拉开 —— 眨眼只该让睁着的眼睛闭上，不该反过来。
+    // 库的动作曲线对眨眼用的也是乘法（`value *= eyeBlinkValue`）。
+    for (const id of blink.parameterIds) {
+      core.setParameterValueById(id, core.getParameterValueById(id) * open)
+    }
   }
 
   /**
@@ -284,8 +495,15 @@ class Live2DRenderer implements PetRenderer {
     this.model.anchor.set(0.5, 1)
     this.model.x = width / 2
     this.model.y = height
+
+    // 缩放/位置变了，掩码记的那块区域跟着作废，立刻重建一张
+    this.refreshMask()
   }
 
+  /**
+   * 命中框（包围盒内缩）。现在只用在两处：气泡的定位锚点，以及掩码不可用时的兜底判定。
+   * 点击穿透与抚摸走的是下面的 hitTest —— 那个按真实像素判。
+   */
   getHitBox(): HitBox | null {
     const bounds = this.model.getBounds()
     if (bounds.width <= 0 || bounds.height <= 0) return null
@@ -299,12 +517,173 @@ class Live2DRenderer implements PetRenderer {
     }
   }
 
-  playMotion(group?: string): void {
-    const target = group ?? this.config.model.idleMotionGroup
-    if (target.length === 0) return
-    void this.model.motion(target).catch(() => {
-      /* 动作组不存在时静默忽略 */
-    })
+  /**
+   * 这个点算不算「在形象上」：点击穿透与抚摸都由它说了算。
+   *
+   * 先用包围盒挡一道（绝大多数指针位置在这一步就出局，比查掩码便宜），盒内再查 alpha 掩码 ——
+   * 形象轮廓之外的透明区域不该挡住桌面。掩码不可用时退回「包围盒内缩」的老语义：
+   * 判错的代价是形象点不动、拖不动，比多挡一点鼠标严重得多。
+   */
+  hitTest(x: number, y: number): boolean {
+    const bounds = this.model.getBounds()
+    if (bounds.width <= 0 || bounds.height <= 0) return false
+
+    const mask = this.mask
+    if (!mask) {
+      const box = this.getHitBox()
+      if (!box) return false
+      return x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height
+    }
+
+    if (x < bounds.x || x > bounds.x + bounds.width) return false
+    if (y < bounds.y || y > bounds.y + bounds.height) return false
+    return this.maskHit(mask, x, y)
+  }
+
+  /** 把点映射回掩码的格子，看邻域里有没有「画到了东西」的格子 */
+  private maskHit(mask: AlphaMask, x: number, y: number): boolean {
+    const col = Math.floor(((x - mask.x) / mask.width) * mask.cols)
+    const row = Math.floor(((y - mask.y) / mask.height) * mask.rows)
+
+    for (let dr = -MASK_SAMPLE_RADIUS; dr <= MASK_SAMPLE_RADIUS; dr += 1) {
+      const r = row + dr
+      if (r < 0 || r >= mask.rows) continue
+      for (let dc = -MASK_SAMPLE_RADIUS; dc <= MASK_SAMPLE_RADIUS; dc += 1) {
+        const c = col + dc
+        if (c < 0 || c >= mask.cols) continue
+        if (mask.alpha[r * mask.cols + c] >= MASK_ALPHA_MIN) return true
+      }
+    }
+    return false
+  }
+
+  /**
+   * 重建命中掩码：把模型**离屏**画一遍，缩成一张小网格，记下每格里有没有画到东西。
+   *
+   * 为什么不用 `renderer.generateTexture` / `extract.canvas(model)` 那条现成的路：
+   * 1. 它按模型的**本地尺寸**开离屏画面 —— 这个形象的本地尺寸是 4068²，
+   *    一次 GPU 回读几十 MB，为了判一个点代价荒谬（这里自己给 resolution，压到 MASK_COLS 宽，几 KB）。
+   * 2. 更要命的是它带着 `skipUpdateTransform: true` 渲染，于是模型在窗口里的**位置和缩放**
+   *    一起被画进那张小画面里 —— 人物会被缩成一个点，掩码几乎全空。
+   *    实测（探针）：按那条路得到的掩码只有 0.2% 的格子有东西，而真实画面是 38.5%。
+   *
+   * 所以这里自己做三件事：把模型自身变换临时归零 → 强制重算世界矩阵地画进离屏纹理 → 还原变换。
+   * 画完再回读，掩码对应的就是「模型的本地画面」，与 getBounds() 只差一个等比缩放。
+   *
+   * 为什么按秒级刷新而不是每帧：轮廓（有没有琴槌、有没有戴帽子）变得很慢，而指针位置每帧都在变。
+   * 实时性要求在这边，不在掩码那边 —— 每帧回读 GPU 会让动画在移动鼠标时卡顿，
+   * 而每两秒回读一次小画面是察觉不到的。
+   */
+  private refreshMask(): void {
+    // 窗口不可见时 rAF 都停了，没必要花这次回读
+    if (document.visibilityState !== 'visible') return
+
+    try {
+      const local = this.model.getLocalBounds()
+      if (!(local.width >= 1) || !(local.height >= 1)) return
+
+      // app.renderer 的静态类型是 Renderer | AbstractRenderer 的联合（Application 允许两种渲染器），
+      // 而 extract 插件只在 WebGL 的 Renderer 上 —— 我们建的就是它
+      const renderer = this.app.renderer as PixiNS.Renderer
+      const texture = this.pixi.RenderTexture.create({
+        width: Math.ceil(local.width),
+        height: Math.ceil(local.height),
+        resolution: MASK_COLS / local.width
+      })
+
+      // 模型自身变换的快照：位置 / 缩放 / 旋转 / 斜切 / pivot 全都要归零，
+      // 少归零一项，画面里就会留着那一项的偏移或缩放
+      const savedTransform = {
+        x: this.model.x,
+        y: this.model.y,
+        rotation: this.model.rotation,
+        scaleX: this.model.scale.x,
+        scaleY: this.model.scale.y,
+        skewX: this.model.skew.x,
+        skewY: this.model.skew.y,
+        pivotX: this.model.pivot.x,
+        pivotY: this.model.pivot.y
+      }
+
+      let source: HTMLCanvasElement
+      try {
+        this.model.x = 0
+        this.model.y = 0
+        this.model.rotation = 0
+        this.model.scale.set(1, 1)
+        this.model.skew.x = 0
+        this.model.skew.y = 0
+        this.model.pivot.x = 0
+        this.model.pivot.y = 0
+
+        const matrix = new this.pixi.Matrix()
+        matrix.tx = -local.x
+        matrix.ty = -local.y
+        renderer.render(this.model as unknown as PixiNS.DisplayObject, {
+          renderTexture: texture,
+          clear: true,
+          transform: matrix,
+          // 必须是 false：只有让 render 重算世界矩阵，上面那次归零才生效
+          // （库内部那条 generateTexture 路径恰恰是 true，这是它在这里不能用的第二个原因）
+          skipUpdateTransform: false
+        })
+      } finally {
+        this.model.x = savedTransform.x
+        this.model.y = savedTransform.y
+        this.model.rotation = savedTransform.rotation
+        this.model.scale.set(savedTransform.scaleX, savedTransform.scaleY)
+        this.model.skew.x = savedTransform.skewX
+        this.model.skew.y = savedTransform.skewY
+        this.model.pivot.x = savedTransform.pivotX
+        this.model.pivot.y = savedTransform.pivotY
+      }
+
+      try {
+        source = renderer.extract.canvas(texture) as HTMLCanvasElement
+      } finally {
+        texture.destroy(true)
+      }
+
+      // 尺寸应该就在 MASK_COLS 附近。差太远说明 Pixi 的 frame/resolution 约定不是这里假设的样子，
+      // 与其拿一张错的掩码去判（那会让形象某半边点不动），不如不判 —— 上层会退回包围盒
+      if (source.width < 8 || source.width > 1024) {
+        throw new Error(`离屏画面尺寸异常：${source.width}×${source.height}`)
+      }
+
+      const cols = MASK_COLS
+      const rows = Math.max(1, Math.round((source.height / source.width) * cols))
+      const small = document.createElement('canvas')
+      small.width = cols
+      small.height = rows
+      const context = small.getContext('2d', { willReadFrequently: true })
+      if (!context) throw new Error('拿不到 2D 上下文')
+
+      context.drawImage(source, 0, 0, cols, rows)
+      const rgba = context.getImageData(0, 0, cols, rows).data
+      const alpha = new Uint8Array(cols * rows)
+      for (let i = 0; i < alpha.length; i += 1) alpha[i] = rgba[i * 4 + 3]
+
+      const bounds = this.model.getBounds()
+      this.mask = {
+        alpha,
+        cols,
+        rows,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height
+      }
+      this.maskWarned = false
+    } catch (error) {
+      this.mask = null
+      if (!this.maskWarned) {
+        this.maskWarned = true
+        console.warn(
+          '[pet] 命中掩码生成失败，回退到包围盒判定（形象轮廓外的透明区域仍会挡住鼠标）：',
+          error
+        )
+      }
+    }
   }
 
   /**
@@ -320,68 +699,16 @@ class Live2DRenderer implements PetRenderer {
     this.model.focus(this.host.clientWidth / 2, this.host.clientHeight / 2)
   }
 
-  /** 表情管理器；模型完全没有表情时返回 undefined */
-  private expressionManager(): NonNullable<
-    NonNullable<Live2DModelLike['internalModel']>['motionManager']
-  >['expressionManager'] {
-    return this.model.internalModel?.motionManager?.expressionManager
-  }
-
-  /**
-   * 切换表情。不传名字表示随机抽一个。
-   *
-   * 这里不能像 playMotion 那样静默失败：库对「名字不存在」和「这个名字已经是当前表情」
-   * 这两种情况**都** resolve(false)，光看返回值区分不出来。名字是主进程扫模型文件生成的
-   * 菜单传过来的，正常情况下必然存在，所以先自己查一次表 —— 否则用户点了没反应时，
-   * 提示会把「你已经套着这个表情了」误报成「这个表情不存在」。
-   */
-  setExpression(name?: string): void {
-    const manager = this.expressionManager()
-
-    if (name !== undefined && manager && manager.getExpressionIndex(name) < 0) {
-      console.warn(`[pet] 这个形象没有名为「${name}」的表情`)
-      return
-    }
-
-    void this.model
-      .expression(name)
-      .then((applied) => {
-        if (applied === false) {
-          console.info(`[pet] 表情未变化：${name ?? '(随机)'}（已经是当前表情，或加载失败）`)
-          return
-        }
-        console.info(`[pet] 已切换表情：${name ?? '(随机)'}`)
-      })
-      .catch((error) => {
-        console.warn('[pet] 切换表情失败：', error)
-      })
-  }
-
-  /** 回到没有任何表情的默认状态 */
-  resetExpression(): void {
-    const manager = this.expressionManager()
-    if (!manager) {
-      console.info('[pet] 这个形象没有表情，无需还原')
-      return
-    }
-    try {
-      manager.resetExpression()
-      // 库的 resetExpression() 只把画面切回默认，**不更新 currentExpression**。
-      // 于是它会一直认为自己还挂着刚才那个表情：还原之后再点回同一个名字，
-      // setExpression() 会判定「已经是当前表情」直接返回 false（什么都不做）。
-      // 补上这一步，之后的套用才能正常工作。这是绕开库的实现疏漏，不是我们的状态。
-      if (manager.defaultExpression !== undefined) {
-        manager.currentExpression = manager.defaultExpression
-      }
-      console.info('[pet] 已还原默认表情')
-    } catch (error) {
-      console.warn('[pet] 还原表情失败：', error)
-    }
-  }
-
   destroy(): void {
     this.observer.disconnect()
+    if (this.maskTimer !== null) {
+      window.clearInterval(this.maskTimer)
+      this.maskTimer = null
+    }
     try {
+      this.model.internalModel?.off('beforeModelUpdate', this.onExpressionFrame)
+      this.model.internalModel?.off('beforeModelUpdate', this.onBlinkFrame)
+      this.model.internalModel?.off('beforeModelUpdate', this.onHidePartsFrame)
       // 必须显式要求一并销毁贴图。库的 destroy() 默认只销毁模型骨架，贴图会继续留在
       // Pixi 的全局 TextureCache 里 —— 于是「切换形象」变成只增不减：把这批模型都浏览
       // 一遍之后，渲染进程会一直背着几百 MB 的解码贴图，且永远不会释放。

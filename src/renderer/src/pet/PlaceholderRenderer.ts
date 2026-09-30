@@ -36,20 +36,39 @@ export class PlaceholderRenderer implements PetRenderer {
     }
   }
 
-  playMotion(): void {
-    // 占位形象没有骨骼动画，这里给出一个轻微的跳动作为反馈
-    this.element.animate(
-      [{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }],
-      { duration: 320, easing: 'ease-out' }
-    )
+  /** 占位形象是一块 CSS 圆角方块，没有可用的 alpha 掩码，按命中框判就好 */
+  hitTest(x: number, y: number): boolean {
+    const box = this.getHitBox()
+    if (!box) return false
+    return x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height
   }
 
-  setExpression(): void {
+  applyExpression(): void {
     // no-op：占位形象不支持表情
   }
 
-  resetExpression(): void {
+  toggleExpression(): void {
     // no-op：占位形象不支持表情
+  }
+
+  removeExpression(): void {
+    // no-op：占位形象不支持表情
+  }
+
+  clearExpressions(): void {
+    // no-op：占位形象不支持表情
+  }
+
+  randomExpression(): void {
+    // no-op：占位形象不支持表情
+  }
+
+  activeExpressions(): string[] {
+    return []
+  }
+
+  hasExpression(): boolean {
+    return false
   }
 
   lookAt(): void {

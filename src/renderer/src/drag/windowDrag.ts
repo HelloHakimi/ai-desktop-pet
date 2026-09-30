@@ -4,7 +4,10 @@
  */
 import type { HitBox } from '../pet/types'
 
-export function bindWindowDrag(target: HTMLElement, onDragEnd?: (moved: boolean) => void): void {
+export function bindWindowDrag(
+  target: HTMLElement,
+  onDragEnd?: (moved: boolean, x: number, y: number) => void
+): void {
   target.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return
     event.preventDefault()
@@ -20,13 +23,17 @@ export function bindWindowDrag(target: HTMLElement, onDragEnd?: (moved: boolean)
     document.body.classList.add('is-dragging')
 
     let finished = false
-    const finish = (): void => {
+    // 松手的位置也带出去：上层要用它区分「点在形象上」和「点在气泡上」——
+    // 两者都算可交互区域，但只有点在形象上才该有反应
+    const finish = (event: PointerEvent): void => {
       if (finished) return
       finished = true
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
       document.body.classList.remove('is-dragging')
-      void window.pet.dragEnd().then((result) => onDragEnd?.(result.moved))
+      void window.pet
+        .dragEnd()
+        .then((result) => onDragEnd?.(result.moved, event.clientX, event.clientY))
     }
 
     window.addEventListener('pointerup', finish)

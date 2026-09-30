@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { loadConfig } from './config'
 import { APP_ENTRY_URL } from './protocol'
 import type { PetConfig } from '@shared/config'
+import { IPC } from '@shared/ipc'
 
 const DRAG_POLL_MS = 16
 /** 位移超过这个像素数才算拖拽，否则视作点击 */
@@ -56,6 +57,7 @@ export function createPetWindow(config: PetConfig): BrowserWindow {
   // 让桌宠跟随用户切换到任何 Space（含全屏应用之上）
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   applyClickThrough()
+  restorePosition(win, config.window.x, config.window.y)
 
   // ready-to-show 是主要时机，did-finish-load 作为兜底，避免极端情况下窗口一直不显示
   const reveal = (): void => {
@@ -84,6 +86,32 @@ export function getPetWindow(): BrowserWindow | null {
   return petWindow !== null && !petWindow.isDestroyed() ? petWindow : null
 }
 
+/** 窗口至少要有这么大一块落在某块屏上，记下来的位置才算还能用 */
+const MIN_VISIBLE_PX = 48
+
+/**
+ * 把窗口摆回上次拖动结束时的位置。
+ *
+ * 必须先验证：记下的坐标可能落在**已经拔掉的显示器**上，那样整窗都在屏幕外，
+ * 用户既看不见也拖不回来，只能去删配置文件。位置无效时什么都不做，交给系统摆。
+ */
+function restorePosition(win: BrowserWindow, x: number | null, y: number | null): void {
+  if (x === null || y === null) return
+
+  const [width, height] = win.getSize()
+  const visible = screen.getAllDisplays().some(({ workArea }) => {
+    const overlapX = Math.min(x + width, workArea.x + workArea.width) - Math.max(x, workArea.x)
+    const overlapY = Math.min(y + height, workArea.y + workArea.height) - Math.max(y, workArea.y)
+    return overlapX >= MIN_VISIBLE_PX && overlapY >= MIN_VISIBLE_PX
+  })
+  if (!visible) {
+    console.warn(`[pet] 配置里的窗口位置（${x}, ${y}）已经不在任何屏幕上了，本次交给系统摆放`)
+    return
+  }
+
+  win.setPosition(x, y)
+}
+
 export function toggleVisible(): void {
   const win = getPetWindow()
   // 窗口没了（比如用默认菜单的 Cmd+W 关掉）就重新建一个，
@@ -94,6 +122,31 @@ export function toggleVisible(): void {
   }
   if (win.isVisible()) win.hide()
   else win.show()
+}
+
+/**
+ * 收起桌宠（形象上的双指轻点 / 右键走这条路）。
+ *
+ * 只做「藏起来」，不做别的：恢复入口是托盘里那同一项「显示 / 隐藏」，
+ * 所以这里不需要把状态记在哪儿 —— 窗口自己的可见性就是状态。
+ */
+export function hidePetWindow(): void {
+  getPetWindow()?.hide()
+}
+
+/**
+ * 把藏起来的桌宠叫回来。
+ *
+ * 恢复入口本来是托盘那一项，但**开始聊天时必须自己出现**：回复是冒在它头顶的气泡上的，
+ * 藏着一只桌宠说给谁听？调用点只有聊天的入口（见 chat/session.ts），
+ * 助手台词（久坐、专注到点、系统事件）刻意不叫它回来 —— 藏起来就是在说「别打扰我」。
+ *
+ * 用 `showInactive` 而不是 `show`：用户这一刻多半正在气泡输入框里打字，
+ * 而那个窗口失焦即关 —— 抢焦点等于把人家正在用的输入框挤掉。
+ */
+export function showPetWindow(): void {
+  const win = getPetWindow()
+  if (win && !win.isVisible()) win.showInactive()
 }
 
 export function isAlwaysOnTop(): boolean {
@@ -154,8 +207,14 @@ export function startDrag(): void {
     const point = screen.getCursorScreenPoint()
     const dx = point.x - dragAnchor.cursorX
     const dy = point.y - dragAnchor.cursorY
-    if (!dragMoved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
-    dragMoved = true
+    if (!dragMoved) {
+      // 位移还没过阈值：这可能是「点击时手抖了一下」，先不动
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
+      dragMoved = true
+      // 拖动真的开始了，通知渲染层 —— 「晕晕」要在拖动过程中就挂上，而不是等松手。
+      // 这一刻只有这里知道：渲染层看不见真实光标，判定权在主进程的轮询里。
+      target.webContents.send(IPC.dragMoved)
+    }
     target.setPosition(Math.round(dragAnchor.winX + dx), Math.round(dragAnchor.winY + dy))
   }, DRAG_POLL_MS)
 }

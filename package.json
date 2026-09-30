@@ -18,7 +18,8 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "setup:live2d": "node scripts/setup-live2d.mjs",
     "make:icon": "python3 scripts/make-app-icon.py",
-    "ai:ping": "node scripts/ai-ping.mjs"
+    "ai:ping": "node scripts/ai-ping.mjs",
+    "ai:fake": "node scripts/fake-openai.mjs"
   },
   "devDependencies": {
     "@pixi/unsafe-eval": "^6.5.10",

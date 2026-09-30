@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; media-src 'self' blob:; worker-src 'self' blob:"
+    />
+    <title>快捷输入</title>
+    <link rel="stylesheet" href="/src/bubble/style.css" />
+  </head>
+  <body>
+    <div class="bubble">
+      <input
+        type="text"
+        id="input"
+        placeholder="输入消息，Enter 发送..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+    <script type="module" src="/src/bubble/main.ts"></script>
+  </body>
+</html>

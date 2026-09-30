@@ -19,6 +19,10 @@ export const APP_SCHEME = 'app'
 export const APP_HOST = 'bundle'
 /** 生产环境下渲染层的入口地址 */
 export const APP_ENTRY_URL = `${APP_SCHEME}://${APP_HOST}/index.html`
+/** 对话窗口的入口地址（第二个渲染入口，见 electron.vite.config.ts 的多页配置） */
+export const APP_CHAT_URL = `${APP_SCHEME}://${APP_HOST}/chat.html`
+/** 气泡输入框的入口地址（Spotlight 风格的悬浮输入窗口） */
+export const APP_BUBBLE_URL = `${APP_SCHEME}://${APP_HOST}/bubble.html`
 
 /**
  * 必须在 app ready 之前调用。

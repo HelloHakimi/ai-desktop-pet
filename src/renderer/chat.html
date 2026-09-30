@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; media-src 'self' blob:; worker-src 'self' blob:"
+    />
+    <title>对话</title>
+  </head>
+  <body>
+    <!-- 对话窗口：消息列表与输入框都挂在这里 -->
+    <div id="chat-root"></div>
+    <script type="module" src="/src/chat/main.ts"></script>
+  </body>
+</html>

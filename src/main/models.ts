@@ -23,7 +23,7 @@ export interface PetModel {
 }
 
 export interface PetExpression {
-  /** 传给 setExpression() 的名字 */
+  /** model3.json 里登记的名字，原样传给渲染层 */
   name: string
   /** 相对模型目录的文件路径，出错时用来定位 */
   file: string
@@ -95,8 +95,17 @@ export function listModels(): PetModel[] {
     return []
   }
 
+  // 读不动的目录（权限、被删除的挂载点）不该让托盘菜单整个建不出来
+  let entries: string[]
+  try {
+    entries = readdirSync(root).sort()
+  } catch (error) {
+    console.warn(`[models] 无法读取模型目录 ${root}：`, error)
+    return []
+  }
+
   const models: PetModel[] = []
-  for (const name of readdirSync(root).sort()) {
+  for (const name of entries) {
     const dir = join(root, name)
     try {
       if (!statSync(dir).isDirectory()) continue
